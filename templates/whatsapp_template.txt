@@ -1,6 +1,6 @@
 🏢 *Cobrança de Condomínio - {{ mes }}*
 
-Segue o QRCODE referente à taxa condominial do mês de *{{ mes }}*.
+Segue os valores referente as despesas condominial do mês de *{{ mes }}*.
 
 💰 *Valor:* R$ {{ "%.2f"|format(valor) }}
 🔑 *Chave PIX:* 11986768497
