@@ -37,7 +37,7 @@
                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pagamentos-{{ item.rateio.id }}" type="button" role="tab">Pagamentos</button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#fundo-{{ item.rateio.id }}" type="button" role="tab">Fundo</button>
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#caixa-{{ item.rateio.id }}" type="button" role="tab">Caixa</button>
             </li>
         </ul>
 
@@ -104,7 +104,7 @@
                     </table>
                 </div>
             </div>
-            <div class="tab-pane fade pt-2" id="fundo-{{ item.rateio.id }}" role="tabpanel">
+            <div class="tab-pane fade pt-2" id="caixa-{{ item.rateio.id }}" role="tabpanel">
                 <div class="table-responsive">
                     <table class="table align-middle">
                         <thead>
@@ -146,8 +146,8 @@
                         <div class="feature-icon">
                             <i class="fas fa-university"></i>
                         </div>
-                        <h4 class="metric-value">R$ {{ item.totais.total_fundo }}</h4>
-                        <p class="metric-label mb-0">Fundo atual</p>
+                        <h4 class="metric-value">R$ {{ item.totais.caixa_atual }}</h4>
+                        <p class="metric-label mb-0">Caixa atual</p>
                     </div>
                 </div>
                 <div class="col-md-4">

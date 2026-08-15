@@ -88,6 +88,27 @@ def mover(rateio_id, cota_id, origem_mes, origem_ano, destino_mes, destino_ano, 
     return result
 
 
+def remover(credito_id):
+    """Remove uma transferência de saldo pelo id. Retorna True se removeu."""
+    session = get_session()
+    registro = session.query(CreditoCota).filter(CreditoCota.id == credito_id).first()
+    if not registro:
+        session.close()
+        return False
+    session.delete(registro)
+    session.commit()
+    session.close()
+    return True
+
+
+def buscar_por_id(credito_id):
+    """Retorna o objeto CreditoCota pelo id (ou None)."""
+    session = get_session()
+    registro = session.query(CreditoCota).filter(CreditoCota.id == credito_id).first()
+    session.close()
+    return registro
+
+
 def total_por_destino(rateio_id, cota_id, mes, ano) -> Decimal:
     """Soma dos créditos movidos para a cota no mês de destino informado."""
     session = get_session()

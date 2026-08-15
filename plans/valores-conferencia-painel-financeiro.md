@@ -55,5 +55,5 @@ Referência usada para validar os fechamentos do rateio "Aruja" (id=1).
 - `pagamentos` = total do extrato + créditos recebidos.
 - `pagamentos_liquido` (aba Pagamentos) = pagamentos − valor transferido.
 - `fundo` = excedente sobre a parcela, limitado ao fundo da cota (100,00).
-- `saldo` = acumulado; deve fechar em 0,00 para meses quitados.
+- `saldo` = resultado do mês (pagamentos + créditos recebidos − parcela − créditos movidos): negativo quando a parcela é maior que o pagamento, 0,00 quando quitado e positivo quando há excedente.
 - Atribuição de pagamento fora do mês esperado é feita exclusivamente pela função "Mover saldo" (qualquer mês com fechamento).

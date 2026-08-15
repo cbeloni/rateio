@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, JSON, String
+from sqlalchemy import Boolean, Column, DateTime, DECIMAL, Integer, JSON, String
 
 from config.database import get_session
 from repository.base import Base
@@ -13,6 +13,7 @@ class Categoria(Base):
     rateio_id = Column(Integer, nullable=False)
     nome = Column(String(100), nullable=False)
     identificadores = Column(JSON, nullable=True)
+    valor_fixo = Column(DECIMAL(10, 2), nullable=True)
     cor = Column(String(20), nullable=True)
     ordem = Column(Integer, nullable=False, default=0)
     ativo = Column(Boolean, nullable=False, default=True)
@@ -33,6 +34,7 @@ class Categoria(Base):
             "rateio_id": self.rateio_id,
             "nome": self.nome,
             "identificadores": self.identificadores or [],
+            "valor_fixo": float(self.valor_fixo) if self.valor_fixo is not None else None,
             "cor": self.cor,
             "ordem": self.ordem,
             "ativo": bool(self.ativo),

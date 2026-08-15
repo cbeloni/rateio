@@ -15,6 +15,7 @@ class Rateio(Base):
     nome = Column(String(255), nullable=False)
     descricao = Column(String(255), nullable=True)
     valor_fundo_padrao = Column(DECIMAL(10, 2), nullable=False, default=Decimal("0.00"))
+    valor_inicial_caixa = Column(DECIMAL(10, 2), nullable=False, default=Decimal("0.00"))
     dia_fechamento = Column(Integer, nullable=False, default=0)
     pluggy_client_id = Column(String(255), nullable=True)
     pluggy_client_secret = Column(String(255), nullable=True)
@@ -38,6 +39,7 @@ class Rateio(Base):
             "nome": self.nome,
             "descricao": self.descricao,
             "valor_fundo_padrao": float(self.valor_fundo_padrao) if self.valor_fundo_padrao is not None else None,
+            "valor_inicial_caixa": float(self.valor_inicial_caixa) if self.valor_inicial_caixa is not None else None,
             "dia_fechamento": self.dia_fechamento,
             "pluggy_client_id": self.pluggy_client_id,
             "pluggy_client_secret": self.pluggy_client_secret,

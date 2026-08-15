@@ -13,6 +13,7 @@ class Cobranca(Base):
     ano = Column(Integer, nullable=False)
     cota = Column(String(255))
     cota_id = Column(Integer, nullable=True)
+    membro_id = Column(Integer, nullable=True)
     valor = Column(DECIMAL(10, 2))
     qrcode = Column(Text)
     brcode = Column(String(1024))
@@ -23,7 +24,9 @@ class Cobranca(Base):
 
     def save(self):
         session = get_session()
-        existing_record = session.query(Cobranca).filter_by(mes=self.mes, ano=self.ano, cota=self.cota).first()
+        existing_record = session.query(Cobranca).filter_by(
+            mes=self.mes, ano=self.ano, cota=self.cota, membro_id=self.membro_id
+        ).first()
         if existing_record:
             session.delete(existing_record)
             session.commit()
@@ -35,6 +38,7 @@ class Cobranca(Base):
             ano=self.ano,
             cota=self.cota,
             cota_id=self.cota_id,
+            membro_id=self.membro_id,
             valor=self.valor,
             qrcode=self.qrcode,
             brcode=self.brcode,
@@ -53,6 +57,7 @@ class Cobranca(Base):
             "ano": self.ano,
             "cota": self.cota,
             "cota_id": self.cota_id,
+            "membro_id": self.membro_id,
             "valor": self.valor,
             "qrcode": self.qrcode,
             "brcode": self.brcode,
@@ -77,17 +82,23 @@ def get_last_cobranca() -> Cobranca:
     return session.query(Cobranca).order_by(Cobranca.id.desc()).first()
 
 
-def marcar_status(mes, ano, cota, status):
+def marcar_status(mes, ano, cota, status, membro_id=None):
     session = get_session()
-    record = session.query(Cobranca).filter_by(mes=mes, ano=ano, cota=cota).first()
+    filtro = {"mes": mes, "ano": ano, "cota": cota}
+    if membro_id is not None:
+        filtro["membro_id"] = membro_id
+    record = session.query(Cobranca).filter_by(**filtro).first()
     if record:
         record.status = status
         session.commit()
 
 
-def marcar_status_whatsapp(mes, ano, cota, status):
+def marcar_status_whatsapp(mes, ano, cota, status, membro_id=None):
     session = get_session()
-    record = session.query(Cobranca).filter_by(mes=mes, ano=ano, cota=cota).first()
+    filtro = {"mes": mes, "ano": ano, "cota": cota}
+    if membro_id is not None:
+        filtro["membro_id"] = membro_id
+    record = session.query(Cobranca).filter_by(**filtro).first()
     if record:
         record.notificacao_whatsapp = status
         session.commit()
@@ -115,3 +126,11 @@ def buscar_por_cota(mes, ano, cota_id):
     registro = session.query(Cobranca).filter_by(mes=mes, ano=ano, cota_id=cota_id).first()
     session.close()
     return registro
+
+
+def listar_por_cota_mes(mes, ano, cota_id):
+    """Lista todas as cobranças (por membro) de uma cota em um mês/ano."""
+    session = get_session()
+    registros = session.query(Cobranca).filter_by(mes=mes, ano=ano, cota_id=cota_id).all()
+    session.close()
+    return registros

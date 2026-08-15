@@ -16,6 +16,7 @@ def criar_tabelas_rateio(engine=None):
     from repository import fechamento_cota as _fechamento_cota  # noqa: F401
     from repository import membro as _membro  # noqa: F401
     from repository import rateio as _rateio  # noqa: F401
+    from repository import responsabilidade as _responsabilidade  # noqa: F401
 
     if engine is None:
         from config.database import criar_engine

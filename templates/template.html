@@ -327,5 +327,156 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Modal global de feedback (carregando / sucesso / erro) -->
+    <div class="modal fade" id="feedbackModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body p-4">
+                    <!-- Carregando -->
+                    <div id="fb-loading" class="text-center">
+                        <div class="spinner-border text-success" style="width:3rem;height:3rem;" role="status"></div>
+                        <p class="mt-3 mb-0 fw-bold">Processando...</p>
+                        <p class="text-muted small mb-0">Aguarde, estamos concluindo a ação.</p>
+                    </div>
+                    <!-- Erro -->
+                    <div id="fb-error" class="d-none">
+                        <div class="text-center">
+                            <i class="fas fa-exclamation-triangle text-danger" style="font-size:3.5rem;"></i>
+                            <p class="mt-3 mb-0 fw-bold">Ocorreu um erro</p>
+                        </div>
+                        <p class="mt-2 mb-1 small text-danger" id="fb-error-msg"></p>
+                        <details id="fb-error-stack-wrap" class="d-none">
+                            <summary class="small text-primary user-select-none">Ver stacktrace completo</summary>
+                            <pre id="fb-error-stack" class="bg-light border rounded p-2 mt-2 mb-0 small" style="max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;"></pre>
+                        </details>
+                        <div class="text-center mt-3">
+                            <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        'use strict';
+
+        var modalEl = document.getElementById('feedbackModal');
+        if (!modalEl) return;
+
+        // Move o modal para o body (corrige o clipping causado por .content-shell/backdrop-filter).
+        document.body.appendChild(modalEl);
+
+        var modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+
+        function fbShow(state) {
+            ['fb-loading', 'fb-error'].forEach(function (id) {
+                document.getElementById(id).classList.toggle('d-none', id !== state);
+            });
+        }
+
+        window.showFeedbackLoading = function () {
+            fbShow('fb-loading');
+            modal.show();
+        };
+
+        window.showFeedbackError = function (msg, stack) {
+            document.getElementById('fb-error-msg').textContent = msg || 'Falha ao executar a ação.';
+            var stackWrap = document.getElementById('fb-error-stack-wrap');
+            var stackPre = document.getElementById('fb-error-stack');
+            if (stack) {
+                stackPre.textContent = stack;
+                stackWrap.classList.remove('d-none');
+            } else {
+                stackWrap.classList.add('d-none');
+            }
+            fbShow('fb-error');
+            modal.show();
+        };
+
+        // Intercepta formulários POST: mostra carregando, envia via fetch e
+        // apresenta o resultado (sucesso/erro com stacktrace) no modal.
+        document.addEventListener('submit', async function (e) {
+            var form = e.target;
+            if (!form || form.tagName !== 'FORM') return;
+            if (e.defaultPrevented) return;
+            var method = (form.getAttribute('method') || 'get').toLowerCase();
+            if (method !== 'post') return;
+            if (form.hasAttribute('data-ajax-off')) return;
+
+            e.preventDefault();
+
+            var submitter = e.submitter;
+            var url = (submitter && submitter.getAttribute('formaction')) || form.action || window.location.href;
+            var formMethod = (submitter && submitter.getAttribute('formmethod')) || 'post';
+
+            showFeedbackLoading();
+
+            try {
+                var fd = new FormData(form);
+                if (submitter && submitter.name) {
+                    fd.append(submitter.name, submitter.value || '');
+                }
+
+                var resp = await fetch(url, {
+                    method: formMethod.toUpperCase(),
+                    body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html, application/json' },
+                    redirect: 'follow',
+                    credentials: 'same-origin'
+                });
+
+                if (resp.ok) {
+                    // Sucesso: fecha o modal de carregando e navega. A mensagem
+                    // de conclusão aparece no topo da tela (após o redirect) e é
+                    // removida automaticamente depois de 3 segundos.
+                    modal.hide();
+                    var finalUrl = resp.url;
+                    setTimeout(function () {
+                        if (finalUrl && finalUrl !== window.location.href) {
+                            window.location.href = finalUrl;
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 150);
+                } else {
+                    var msgErro = null;
+                    var stack = null;
+                    var ctErr = resp.headers.get('content-type') || '';
+                    if (ctErr.indexOf('application/json') >= 0) {
+                        try {
+                            var data = await resp.json();
+                            if (data) {
+                                if (data.detail !== undefined) {
+                                    msgErro = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+                                }
+                                if (data.traceback) stack = data.traceback;
+                            }
+                        } catch (err) { /* não é JSON */ }
+                    } else if (ctErr.indexOf('text/html') >= 0) {
+                        var htmlErr = await resp.text();
+                        var docErr = new DOMParser().parseFromString(htmlErr, 'text/html');
+                        var alertErr = docErr.querySelector('.alert.alert-danger') || docErr.querySelector('.alert-danger');
+                        if (alertErr) msgErro = alertErr.textContent.trim();
+                    }
+                    showFeedbackError(msgErro || ('Erro ' + resp.status + ' ao executar a ação.'), stack);
+                }
+            } catch (err) {
+                showFeedbackError('Falha na comunicação com o servidor.', err && err.stack);
+            }
+        });
+
+        // Remove automaticamente a mensagem de sucesso do topo da tela após 3s.
+        setTimeout(function () {
+            document.querySelectorAll('.alert.alert-success').forEach(function (a) {
+                a.style.transition = 'opacity 0.5s ease';
+                a.style.opacity = '0';
+                setTimeout(function () { if (a.parentNode) a.parentNode.removeChild(a); }, 500);
+            });
+        }, 3000);
+    })();
+    </script>
 </body>
 </html>

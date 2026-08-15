@@ -141,44 +141,65 @@
                         {% else %}0.00{% endif %}
                     </td>
                     <td class="text-center">
-                        {% if cota.qr_url %}
-                        <div class="d-flex align-items-center justify-content-center gap-1">
-                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#qrModal" data-qr="{{ cota.qr_url }}" title="Ver QR Code"><i class="fas fa-qrcode"></i></button>
-                            <form method="post" action="/fechamentos/cobrar-cota" class="d-inline">
-                                <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
-                                <input type="hidden" name="cota_id" value="{{ cota.id }}">
-                                <input type="hidden" name="mes" value="{{ mes.mes }}">
-                                <input type="hidden" name="ano" value="{{ mes.ano }}">
-                                <button type="submit" class="btn btn-sm btn-outline-success" title="Disparar cobrança"><i class="fas fa-paper-plane"></i></button>
-                            </form>
+                        {% if cota.qrs %}
+                        <div class="d-flex flex-wrap align-items-center justify-content-center gap-1">
+                            {% for qr in cota.qrs %}
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#qrModal"
+                                    data-qr="{{ qr.qr_url }}" data-valor="{{ '%.2f'|format(qr.valor) }}"
+                                    data-brcode="{{ qr.brcode }}" data-rotulo="{{ qr.rotulo }}"
+                                    title="Ver QR Code: {{ qr.rotulo }} — R$ {{ '%.2f'|format(qr.valor) }}">
+                                <i class="fas fa-qrcode me-1"></i>{{ '%.2f'|format(qr.valor) }}
+                            </button>
+                            {% endfor %}
                         </div>
-                        {% else %}
-                        <span class="text-muted small">—</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end fw-bold {{ 'text-success' if cota.saldo > 0 else '' }}">{{ '%.2f'|format(cota.saldo) }}</td>
-                    <td>
-                        {% if cota.saldo > 0 %}
-                        <form method="post" action="/fechamentos/mover-saldo" class="d-flex align-items-center gap-2">
+                        <form method="post" action="/fechamentos/cobrar-cota" class="d-inline mt-1">
                             <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
                             <input type="hidden" name="cota_id" value="{{ cota.id }}">
-                            <input type="hidden" name="origem_mes" value="{{ mes.mes }}">
-                            <input type="hidden" name="origem_ano" value="{{ mes.ano }}">
-                            <input type="number" step="0.01" class="form-control form-control-sm w-auto" name="valor" value="{{ '%.2f'|format(cota.saldo) }}">
-                            <select class="form-select form-select-sm w-auto" name="destino">
-                                {% for m in meses %}
-                                {% if not (m.mes == mes.mes and m.ano == mes.ano) %}
-                                <option value="{{ m.mes }}|{{ m.ano }}">{{ m.mes }}/{{ m.ano }}</option>
-                                {% endif %}
-                                {% endfor %}
-                            </select>
-                            <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">
-                                Mover saldo
-                            </button>
+                            <input type="hidden" name="mes" value="{{ mes.mes }}">
+                            <input type="hidden" name="ano" value="{{ mes.ano }}">
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="Disparar cobrança"><i class="fas fa-paper-plane"></i></button>
                         </form>
                         {% else %}
                         <span class="text-muted small">—</span>
                         {% endif %}
+                    </td>
+                    <td class="text-end fw-bold {{ 'text-danger' if cota.saldo < 0 else ('text-primary' if cota.saldo > 0 else 'text-success') }}">{{ '%.2f'|format(cota.saldo) }}</td>
+                    <td>
+                        <div class="d-flex flex-column align-items-start gap-1">
+                            {% if cota.saldo > 0 %}
+                            <form method="post" action="/fechamentos/mover-saldo" class="d-flex align-items-center gap-2">
+                                <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+                                <input type="hidden" name="cota_id" value="{{ cota.id }}">
+                                <input type="hidden" name="origem_mes" value="{{ mes.mes }}">
+                                <input type="hidden" name="origem_ano" value="{{ mes.ano }}">
+                                <input type="number" step="0.01" class="form-control form-control-sm w-auto" name="valor" value="{{ '%.2f'|format(cota.saldo) }}">
+                                <select class="form-select form-select-sm w-auto" name="destino">
+                                    {% for m in meses %}
+                                    {% if not (m.mes == mes.mes and m.ano == mes.ano) %}
+                                    <option value="{{ m.mes }}|{{ m.ano }}">{{ m.mes }}/{{ m.ano }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">
+                                    Mover saldo
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% for mv in cota.movimentacoes %}
+                            <form method="post" action="/fechamentos/remover-transferencia" class="d-inline"
+                                  onsubmit="return confirm('Remover esta transferência de saldo?');">
+                                <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+                                <input type="hidden" name="credito_id" value="{{ mv.id }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover transferência de R$ {{ '%.2f'|format(mv.valor) }}">
+                                    <i class="fas fa-trash-alt me-1"></i>
+                                    {% if mv.tipo == 'origem' %}→{% else %}←{% endif %} {{ mv.outro_mes }}/{{ mv.outro_ano }}
+                                </button>
+                            </form>
+                            {% endfor %}
+                            {% if cota.saldo <= 0 and not cota.movimentacoes %}
+                            <span class="text-muted small">—</span>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -195,30 +216,61 @@
 {% endif %}
 
 <div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-dialog modal-dialog-centered modal-md">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">QR Code</h5>
+                <h5 class="modal-title" id="qrModalTitulo">QR Code</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
             <div class="modal-body text-center">
-                <img id="qrModalImage" src="" class="img-fluid" alt="QR Code">
+                <img id="qrModalImage" src="" class="img-fluid mb-3" alt="QR Code" style="max-width: 260px;">
+                <div class="fs-5 fw-bold mb-3">R$ <span id="qrModalValor">0,00</span></div>
+                <div class="input-group input-group-sm">
+                    <input type="text" id="qrModalBrcode" class="form-control" readonly aria-label="Código PIX copia e cola">
+                    <button type="button" id="qrModalCopiar" class="btn btn-outline-primary" onclick="copiarBrcode()">
+                        <i class="fas fa-copy me-1"></i>Copiar
+                    </button>
+                </div>
+                <div class="form-text mt-1">Código PIX copia e cola</div>
             </div>
         </div>
     </div>
 </div>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    var modal = document.getElementById('qrModal');
-    if (modal) {
-        // Move o modal para o body. O .content-shell usa backdrop-filter, que cria
-        // um novo contexto de posicionamento e quebra o position: fixed do modal,
-        // fazendo ele ficar escondido/clipado atrás do overlay.
-        document.body.appendChild(modal);
+function copiarBrcode() {
+    var input = document.getElementById('qrModalBrcode');
+    input.select();
+    input.setSelectionRange(0, 99999);
+    var btn = document.getElementById('qrModalCopiar');
+    var done = function () {
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>Copiado';
+        setTimeout(function () { btn.innerHTML = '<i class="fas fa-copy me-1"></i>Copiar'; }, 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).then(done).catch(function () {
+            document.execCommand('copy');
+            done();
+        });
+    } else {
+        document.execCommand('copy');
+        done();
+    }
+}
 
-        modal.addEventListener('show.bs.modal', function (event) {
+document.addEventListener('DOMContentLoaded', function () {
+    // Move o modal de QR para o body. O .content-shell usa backdrop-filter, que
+    // cria um novo contexto de posicionamento e quebra o position: fixed do
+    // modal, fazendo ele ficar escondido/clipado atrás do overlay.
+    var qrModal = document.getElementById('qrModal');
+    if (qrModal) {
+        document.body.appendChild(qrModal);
+
+        qrModal.addEventListener('show.bs.modal', function (event) {
             var btn = event.relatedTarget;
             document.getElementById('qrModalImage').src = btn.getAttribute('data-qr');
+            document.getElementById('qrModalValor').textContent = btn.getAttribute('data-valor') || '0,00';
+            document.getElementById('qrModalBrcode').value = btn.getAttribute('data-brcode') || '';
+            document.getElementById('qrModalTitulo').textContent = 'QR Code — ' + (btn.getAttribute('data-rotulo') || '');
         });
     }
 });

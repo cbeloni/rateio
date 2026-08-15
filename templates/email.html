@@ -6,47 +6,108 @@
     <title>Pagamento PIX Disponível</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: Arial, Helvetica, sans-serif;
             line-height: 1.6;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
         }
         .container {
             max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            padding: 24px 16px;
+        }
+        .card {
+            background: #ffffff;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            padding: 24px;
         }
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
-        .content {
-            margin-bottom: 20px;
+        .header h1 {
+            font-size: 22px;
+            color: #1a7f37;
+            margin: 0;
+        }
+        .valor {
+            text-align: center;
+            font-size: 30px;
+            font-weight: bold;
+            color: #1a7f37;
+            margin: 16px 0;
+        }
+        .qr {
+            text-align: center;
+            margin: 16px 0;
+        }
+        .qr img {
+            max-width: 240px;
+            width: 100%;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+        }
+        .pix-box {
+            background: #f6f8fa;
+            border: 1px dashed #8b949e;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 16px 0 8px;
+        }
+        .pix-label {
+            font-size: 11px;
+            color: #57606a;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0 0 4px;
+        }
+        .pix-code {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            color: #24292f;
+            word-break: break-all;
+            white-space: normal;
+        }
+        .dica {
+            font-size: 12px;
+            color: #57606a;
+            margin-top: 8px;
         }
         .footer {
             text-align: center;
+            color: #8b949e;
+            font-size: 12px;
             margin-top: 20px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Pagamento PIX Disponível</h1>
-        </div>
-        <div class="content">
+        <div class="card">
+            <div class="header">
+                <h1>Pagamento PIX Disponível</h1>
+            </div>
+
             <p>Olá,</p>
-            <p>O pagamento PIX para o mês de {{ mes }} está disponível.</p>
-            <p>Valor: R$ {{ valor }}</p>
-            <p>Código PIX: </p>
-            <p>
-                <input type="text" id="codigo_pix" value="{{ codigo_pix }}" readonly>
-            </p>
-            <p><img src="{{ imagem_url }}" alt="Imagem do qrcode pix" width="100%"></p>
+            <p>O pagamento PIX referente ao mês de <strong>{{ mes }}</strong> está disponível.</p>
+
+            <div class="valor">R$ {{ '%.2f'|format(valor) }}</div>
+
+            <div class="qr">
+                <img src="{{ imagem_url }}" alt="QR Code PIX">
+            </div>
+
+            <div class="pix-box">
+                <p class="pix-label">Código PIX (copia e cola)</p>
+                <div class="pix-code">{{ codigo_pix }}</div>
+            </div>
+
+            <p class="dica">Escaneie o QR Code ou copie o código acima no aplicativo do seu banco para efetuar o pagamento.</p>
         </div>
-        <div class="footer">
-            Rateio Online
-        </div>
+
+        <div class="footer">Rateio Online</div>
     </div>
 </body>
 </html>

@@ -53,7 +53,8 @@
                             <th>Nome</th>
                             <th>E-mail</th>
                             <th>Telefone</th>
-                            <th>Valor fixo (R$)</th>
+                            <th>Principal</th>
+                            <th>Categorias</th>
                             <th>Identificadores</th>
                             <th></th>
                         </tr>
@@ -64,7 +65,8 @@
                             <td class="fw-bold">{{ membro.nome }}</td>
                             <td>{{ membro.email or '-' }}</td>
                             <td>{{ membro.telefone or '-' }}</td>
-                            <td>{{ '%.2f'|format(membro.valor_fixo) if membro.valor_fixo is not none else '-' }}</td>
+                            <td>{% if membro.principal %}<i class="fas fa-star text-warning" title="Membro principal"></i>{% else %}-{% endif %}</td>
+                            <td><small>{{ membro.categorias_responsavel_nomes|join(', ') or '-' }}</small></td>
                             <td><small>{{ membro.identificadores_pagamento|join(', ') }}</small></td>
                             <td class="text-end">
                                 <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#membro-{{ membro.id }}">
@@ -73,7 +75,7 @@
                             </td>
                         </tr>
                         <tr class="collapse" id="membro-{{ membro.id }}">
-                            <td colspan="6">
+                            <td colspan="7">
                                 <form method="post" action="/membros/{{ membro.id }}" class="row g-2">
                                     <div class="col-md-3">
                                         <label class="form-label small">Nome</label>
@@ -87,18 +89,29 @@
                                         <label class="form-label small">Telefone</label>
                                         <input type="text" class="form-control form-control-sm" name="telefone" value="{{ membro.telefone or '' }}">
                                     </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label small">Valor fixo (R$)</label>
-                                        <input type="number" step="0.01" class="form-control form-control-sm" name="valor_fixo" value="{{ membro.valor_fixo or '' }}">
-                                        <div class="form-text">Pago todo mês; descontado do QR Code da cota.</div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label small">Senha inicial</label>
-                                        <input type="password" class="form-control form-control-sm" name="senha_inicial" placeholder="Opcional">
-                                    </div>
                                     <div class="col-12">
                                         <label class="form-label small">Identificadores de pagamento</label>
                                         <input type="text" class="form-control form-control-sm" name="identificadores" value="{{ membro.identificadores_pagamento|join(', ') }}">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small">Categorias que é responsável</label>
+                                        <select class="form-select form-select-sm" name="categorias_responsavel" multiple>
+                                            {% for categoria in categorias %}
+                                            <option value="{{ categoria.id }}" {% if categoria.id in membro.categorias_responsavel %}selected{% endif %}>{{ categoria.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="principal" id="principal-{{ membro.id }}" value="1" {% if membro.principal %}checked{% endif %}>
+                                            <label class="form-check-label small" for="principal-{{ membro.id }}">Membro principal (recebe o QR Code do restante)</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="receber_mensagens" id="receber-{{ membro.id }}" value="1" {% if membro.receber_mensagens %}checked{% endif %}>
+                                            <label class="form-check-label small" for="receber-{{ membro.id }}">Receber mensagens de cobrança</label>
+                                        </div>
                                     </div>
                                     <div class="col-12 text-end">
                                         <button type="submit" class="btn btn-sm btn-success">Salvar</button>
@@ -132,17 +145,32 @@
                     <input type="text" class="form-control" name="telefone">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">Valor fixo (R$)</label>
-                    <input type="number" step="0.01" class="form-control" name="valor_fixo">
-                    <div class="form-text">Pago todo mês; descontado do QR Code da cota.</div>
-                </div>
-                <div class="col-md-4">
                     <label class="form-label small">Senha inicial (opcional)</label>
                     <input type="password" class="form-control" name="senha_inicial">
                 </div>
                 <div class="col-12">
                     <label class="form-label small">Identificadores de pagamento (separados por vírgula)</label>
                     <input type="text" class="form-control" name="identificadores">
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">Categorias que é responsável</label>
+                    <select class="form-select" name="categorias_responsavel" multiple>
+                        {% for categoria in categorias %}
+                        <option value="{{ categoria.id }}">{{ categoria.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="principal" id="principal-novo" value="1">
+                        <label class="form-check-label small" for="principal-novo">Membro principal (recebe o QR Code do restante)</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="receber_mensagens" id="receber-novo" value="1" checked>
+                        <label class="form-check-label small" for="receber-novo">Receber mensagens de cobrança</label>
+                    </div>
                 </div>
                 <div class="col-12 text-end">
                     <button type="submit" class="btn btn-success">

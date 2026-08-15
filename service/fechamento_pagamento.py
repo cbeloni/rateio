@@ -3,15 +3,16 @@ import logging
 from decimal import Decimal, ROUND_HALF_UP
 
 from dto.fechamento_requests import get_transacao_credito
+from repository.categoria import listar_por_rateio as listar_categorias
 from repository.cota import listar_por_rateio as listar_cotas
 from repository.credito_cota import total_por_destino as credito_por_destino
 from repository.credito_cota import total_por_origem as credito_por_origem
-from repository.despesa import total_por_rateio_mes
-from repository.fechamento_cota import saldo_anterior, upsert as upsert_fechamento
+from repository.despesa import total_por_rateio_mes, upsert as upsert_despesa
+from repository.fechamento_cota import upsert as upsert_fechamento
 from repository.membro import listar_por_rateio as listar_membros
 from repository.extrato import ExtratoRepository
 from repository.rateio import listar_todos
-from service.rateio_service import cota_financiadora, valor_fundo_da_cota
+from service.rateio_service import cota_financiadora
 from util.datas_uteis import meses_portugues
 
 
@@ -46,8 +47,18 @@ def fechar_pagamentos(data_inicial, data_final, rateio_id=None, mes=None, ano=No
             identificadores_por_cota.setdefault(cota_id, [])
             identificadores_por_cota[cota_id].extend(membro.get("identificadores_pagamento") or [])
 
-        total_despesas = Decimal(total_por_rateio_mes(rateio_id, mes, ano))
+        categorias = listar_categorias(rateio_id, apenas_ativas=True)
         n_ativas = len(cotas)
+
+        # Categorias fixas (valor_fixo por cota) — obrigação mensal, não vem do extrato.
+        caixa_por_cota = Decimal("0.00")
+        for categoria in categorias:
+            if categoria.get("valor_fixo") is not None:
+                vf = Decimal(str(categoria["valor_fixo"]))
+                caixa_por_cota += vf
+                upsert_despesa(rateio_id, mes, ano, categoria["id"], vf * n_ativas)
+
+        total_despesas = Decimal(total_por_rateio_mes(rateio_id, mes, ano))
         parcela = (
             (total_despesas / n_ativas).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             if n_ativas
@@ -72,20 +83,13 @@ def fechar_pagamentos(data_inicial, data_final, rateio_id=None, mes=None, ano=No
                     pagamentos_reais[cota_id] += valor
                     break
 
-        # Créditos movidos entre meses (mover saldo) e fundo por cota.
+        # Créditos movidos entre meses (mover saldo).
         creditos_recebidos = {}
         creditos_movidos = {}
-        fundo = {}
         for cota in cotas:
             cota_id = cota["id"]
             creditos_recebidos[cota_id] = credito_por_destino(rateio_id, cota_id, mes, ano)
             creditos_movidos[cota_id] = credito_por_origem(rateio_id, cota_id, mes, ano)
-            total_pagamento = pagamentos_reais[cota_id] + creditos_recebidos[cota_id]
-            excesso = max(total_pagamento - parcela, Decimal("0.00"))
-            limite = valor_fundo_da_cota(rateio, cota)
-            fundo[cota_id] = min(excesso, limite).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
 
         # Pagamentos: total do extrato + créditos recebidos de meses anteriores.
         pagamentos = {
@@ -95,11 +99,33 @@ def fechar_pagamentos(data_inicial, data_final, rateio_id=None, mes=None, ano=No
             for c in cotas
         }
 
-        # Saldo acumulado por cota.
+        # Fundo (caixa) por cota = excedente do pagamento sobre a parcela das
+        # despesas do extrato (sem a caixa), limitado ao valor fixo da caixa.
+        caixa_total = (caixa_por_cota * n_ativas).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        despesas_extrato = (total_despesas - caixa_total).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        parcela_extrato = (
+            (despesas_extrato / n_ativas).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if n_ativas
+            else Decimal("0.00")
+        )
+        fundo = {}
+        for cota in cotas:
+            cota_id = cota["id"]
+            excesso = pagamentos[cota_id] - parcela_extrato
+            if excesso < 0:
+                excesso = Decimal("0.00")
+            if excesso > caixa_por_cota:
+                excesso = caixa_por_cota
+            fundo[cota_id] = excesso.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Saldo do mês por cota (pagamentos − parcela), sem acumular meses anteriores.
         saldos = {}
         for cota in cotas:
             cota_id = cota["id"]
-            anterior = saldo_anterior(rateio_id, cota_id, excluir_mes=mes, excluir_ano=ano)
             if financiadora_id is not None and cota_id == financiadora_id:
                 # A cota financiadora adiantou as despesas; os pagamentos das demais
                 # cotas abatem o que ainda é devido a ela.
@@ -110,11 +136,9 @@ def fechar_pagamentos(data_inicial, data_final, rateio_id=None, mes=None, ano=No
             else:
                 total_atribuido = pagamentos_reais[cota_id]
             saldos[cota_id] = (
-                anterior
-                + total_atribuido
+                total_atribuido
                 + creditos_recebidos[cota_id]
                 - parcela
-                - fundo[cota_id]
                 - creditos_movidos[cota_id]
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
@@ -158,11 +182,15 @@ def _periodo_pagamentos_por_nome(mes, ano):
     return data_inicial, data_final
 
 
-def recalcular_fechamentos(rateio_id):
-    """Recomputa todos os fechamentos do rateio em ordem cronológica.
+def recalcular_fechamentos(rateio_id, a_partir_de=None):
+    """Recomputa os fechamentos do rateio em ordem cronológica.
 
     Deve ser chamado após movimentações de saldo entre meses, para que os meses
     de origem e destino reflitam os valores corretos.
+
+    a_partir_de: tupla (mes, ano) opcional. Quando informada, recalcula apenas
+    desse mês em diante (mês alterado até o mais recente), evitando refazer
+    todos os fechamentos.
     """
     from repository.despesa import listar_por_rateio as listar_despesas
 
@@ -171,6 +199,16 @@ def recalcular_fechamentos(rateio_id):
         {(d["mes"], d["ano"]) for d in despesas},
         key=lambda k: (k[1], MESES_ORDEM.get(k[0], 99)),
     )
+
+    if a_partir_de is not None:
+        mes_inicio, ano_inicio = a_partir_de
+        ordem_inicio = (ano_inicio, MESES_ORDEM.get(mes_inicio, 99))
+        meses_ano = [
+            (m, a)
+            for (m, a) in meses_ano
+            if (a, MESES_ORDEM.get(m, 99)) >= ordem_inicio
+        ]
+
     for mes, ano in meses_ano:
         data_inicial, data_final = _periodo_pagamentos_por_nome(mes, ano)
         fechar_pagamentos(data_inicial, data_final, rateio_id=rateio_id, mes=mes, ano=ano)

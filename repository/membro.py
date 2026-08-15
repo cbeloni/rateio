@@ -15,8 +15,9 @@ class Membro(Base):
     nome = Column(String(255), nullable=False)
     email = Column(String(255), nullable=True)
     telefone = Column(String(50), nullable=True)
-    valor_fixo = Column(DECIMAL(10, 2), nullable=True)
     identificadores_pagamento = Column(JSON, nullable=True)
+    principal = Column(Boolean, nullable=False, default=False)
+    receber_mensagens = Column(Boolean, nullable=False, default=True)
     ativo = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -37,8 +38,9 @@ class Membro(Base):
             "nome": self.nome,
             "email": self.email,
             "telefone": self.telefone,
-            "valor_fixo": float(self.valor_fixo) if self.valor_fixo is not None else None,
             "identificadores_pagamento": self.identificadores_pagamento or [],
+            "principal": bool(self.principal),
+            "receber_mensagens": bool(self.receber_mensagens),
             "ativo": bool(self.ativo),
             "created_at": self.created_at,
         }

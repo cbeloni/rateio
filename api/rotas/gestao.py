@@ -38,7 +38,9 @@ from repository.rateio import (
     listar_por_organizador,
 )
 from repository.usuario import Usuario, buscar_por_email, listar_usuarios
-from repository.credito_cota import mover as mover_credito
+from repository.credito_cota import buscar_por_id as buscar_credito
+from repository.credito_cota import mover as mover_credito, remover as remover_credito
+from repository.responsabilidade import listar_por_rateio as listar_responsabilidades, substituir_do_membro
 from service.auth_service import exigir_login, hash_senha
 from service.cobrar_service import cobrar_cota as cobrar_cota_service, cobrar_e_enviar_whatsapp
 from service.dashboard import montar_dashboard
@@ -108,6 +110,13 @@ def _periodo_pagamentos(mes_numero, ano):
     return data_inicial, data_final, mes_nome
 
 
+def _mes_mais_antigo(mes1, ano1, mes2, ano2):
+    """Retorna a tupla (mes, ano) cronologicamente menor entre os dois períodos."""
+    ordem1 = (ano1, MESES_NUMERO.get(mes1, 99))
+    ordem2 = (ano2, MESES_NUMERO.get(mes2, 99))
+    return (mes1, ano1) if ordem1 <= ordem2 else (mes2, ano2)
+
+
 def _membro_de_rateio(usuario_id: int, rateio_id: int) -> bool:
     """Verifica se o usuário é membro de alguma cota do rateio."""
     for cota in listar_cotas(rateio_id):
@@ -163,6 +172,7 @@ async def criar_rateio(request: Request):
     nome = str(form.get("nome", "")).strip()
     descricao = str(form.get("descricao", "")).strip() or None
     valor_fundo_padrao = _decimal_ou(form.get("valor_fundo_padrao"), Decimal("0.00"))
+    valor_inicial_caixa = _decimal_ou(form.get("valor_inicial_caixa"), Decimal("0.00"))
     pluggy_client_id = str(form.get("pluggy_client_id", "")).strip() or None
     pluggy_client_secret = str(form.get("pluggy_client_secret", "")).strip() or None
     pluggy_account_id = str(form.get("pluggy_account_id", "")).strip() or None
@@ -177,6 +187,7 @@ async def criar_rateio(request: Request):
         organizador_id=usuario["id"],
         descricao=descricao,
         valor_fundo_padrao=valor_fundo_padrao,
+        valor_inicial_caixa=valor_inicial_caixa,
         dia_fechamento=dia_fechamento,
         pluggy_client_id=pluggy_client_id,
         pluggy_client_secret=pluggy_client_secret,
@@ -209,6 +220,9 @@ async def salvar_rateio(request: Request, rateio_id: int):
     rateio.descricao = str(form.get("descricao", "")).strip() or None
     rateio.valor_fundo_padrao = _decimal_ou(
         form.get("valor_fundo_padrao"), rateio.valor_fundo_padrao
+    )
+    rateio.valor_inicial_caixa = _decimal_ou(
+        form.get("valor_inicial_caixa"), rateio.valor_inicial_caixa
     )
     rateio.pluggy_client_id = str(form.get("pluggy_client_id", "")).strip() or None
     rateio.pluggy_client_secret = str(form.get("pluggy_client_secret", "")).strip() or None
@@ -289,6 +303,16 @@ async def pagina_cota(request: Request, cota_id: int):
     membros = listar_membros(cota_id)
     cotas = listar_cotas(cota.rateio_id)
     usuarios = listar_usuarios()
+    categorias = listar_categorias(cota.rateio_id)
+
+    resp_por_membro = {}
+    for r in listar_responsabilidades(cota.rateio_id):
+        resp_por_membro.setdefault(r["membro_id"], set()).add(r["categoria_id"])
+    nomes_categoria = {c["id"]: c["nome"] for c in categorias}
+    for m in membros:
+        ids = sorted(resp_por_membro.get(m["id"], set()))
+        m["categorias_responsavel"] = ids
+        m["categorias_responsavel_nomes"] = [nomes_categoria.get(cid, str(cid)) for cid in ids]
 
     return templates.TemplateResponse(
         "cota.html",
@@ -300,6 +324,7 @@ async def pagina_cota(request: Request, cota_id: int):
             "membros": membros,
             "cotas": cotas,
             "usuarios": usuarios,
+            "categorias": categorias,
         },
     )
 
@@ -340,10 +365,10 @@ async def criar_membro(request: Request):
     nome = str(form.get("nome", "")).strip()
     email = str(form.get("email", "")).strip() or None
     telefone = str(form.get("telefone", "")).strip() or None
-    valor_fixo_raw = str(form.get("valor_fixo", "")).strip()
-    valor_fixo = _decimal_ou(valor_fixo_raw, None) if valor_fixo_raw else None
     identificadores = _parse_identificadores(form.get("identificadores", ""))
     senha_inicial = str(form.get("senha_inicial", "")).strip() or None
+    principal = form.get("principal") is not None
+    receber_mensagens = form.get("receber_mensagens") is not None
 
     cota = buscar_cota(cota_id)
     if not cota or not nome:
@@ -353,15 +378,19 @@ async def criar_membro(request: Request):
     if not rateio:
         return RedirectResponse(url="/rateios", status_code=303)
 
-    _salvar_membro(
+    categoria_ids = form.getlist("categorias_responsavel")
+    membro_salvo = _salvar_membro(
         cota_id,
         nome,
         email,
         telefone,
         identificadores,
-        valor_fixo=valor_fixo,
         senha_inicial=senha_inicial,
+        principal=principal,
+        receber_mensagens=receber_mensagens,
     )
+    if membro_salvo:
+        substituir_do_membro(cota.rateio_id, membro_salvo["id"], categoria_ids)
     return RedirectResponse(url=f"/cotas/{cota_id}?mensagem=Membro+adicionado+com+sucesso", status_code=303)
 
 
@@ -388,21 +417,22 @@ async def salvar_membro(request: Request, membro_id: int):
     nome = str(form.get("nome", "")).strip()
     email = str(form.get("email", "")).strip() or None
     telefone = str(form.get("telefone", "")).strip() or None
-    valor_fixo_raw = str(form.get("valor_fixo", "")).strip()
-    valor_fixo = _decimal_ou(valor_fixo_raw, None) if valor_fixo_raw else None
     identificadores = _parse_identificadores(form.get("identificadores", ""))
-    senha_inicial = str(form.get("senha_inicial", "")).strip() or None
+    principal = form.get("principal") is not None
+    receber_mensagens = form.get("receber_mensagens") is not None
 
+    categoria_ids = form.getlist("categorias_responsavel")
     _salvar_membro(
         cota_id,
         nome,
         email,
         telefone,
         identificadores,
-        valor_fixo=valor_fixo,
         membro_id=membro_id,
-        senha_inicial=senha_inicial,
+        principal=principal,
+        receber_mensagens=receber_mensagens,
     )
+    substituir_do_membro(cota.rateio_id, membro_id, categoria_ids)
     return RedirectResponse(url=f"/cotas/{cota_id}?mensagem=Membro+salvo+com+sucesso", status_code=303)
 
 
@@ -427,7 +457,7 @@ def _vincular_usuario(nome, email, senha_inicial):
     return usuario.id
 
 
-def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=None, membro_id=None, senha_inicial=None, valor_fixo=None):
+def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=None, membro_id=None, senha_inicial=None, principal=False, receber_mensagens=True):
     if senha_inicial and email:
         usuario_id = _vincular_usuario(nome, email, senha_inicial)
 
@@ -440,7 +470,8 @@ def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=N
         membro.nome = nome
         membro.email = email
         membro.telefone = telefone
-        membro.valor_fixo = valor_fixo
+        membro.principal = bool(principal)
+        membro.receber_mensagens = bool(receber_mensagens)
         membro.identificadores_pagamento = identificadores
         membro.usuario_id = usuario_id
     else:
@@ -449,7 +480,8 @@ def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=N
             nome=nome,
             email=email,
             telefone=telefone,
-            valor_fixo=valor_fixo,
+            principal=bool(principal),
+            receber_mensagens=bool(receber_mensagens),
             identificadores_pagamento=identificadores,
             usuario_id=usuario_id,
             ativo=True,
@@ -458,6 +490,13 @@ def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=N
 
     session.commit()
     session.refresh(membro)
+    if principal:
+        # Garante um único membro principal por cota.
+        session.query(Membro).filter(
+            Membro.cota_id == cota_id,
+            Membro.id != membro.id,
+        ).update({Membro.principal: False})
+        session.commit()
     session.close()
     return membro.to_dict()
 
@@ -501,10 +540,12 @@ async def criar_categoria(request: Request):
     if not rateio or not nome:
         return RedirectResponse(url=f"/categorias?rateio_id={rateio_id}", status_code=303)
 
+    valor_fixo = _decimal_ou(form.get("valor_fixo"), None)
     categoria = Categoria(
         rateio_id=rateio_id,
         nome=nome,
         identificadores=identificadores,
+        valor_fixo=valor_fixo,
         cor=cor,
         ordem=ordem,
         ativo=True,
@@ -530,6 +571,7 @@ async def salvar_categoria(request: Request, categoria_id: int):
     ordem_raw = str(form.get("ordem", "")).strip()
     categoria.ordem = int(ordem_raw) if ordem_raw else 0
     categoria.identificadores = _parse_identificadores(form.get("identificadores", ""))
+    categoria.valor_fixo = _decimal_ou(form.get("valor_fixo"), None)
     categoria.ativo = form.get("ativo") is not None
 
     session = get_session()
@@ -728,6 +770,7 @@ async def pagina_fechamentos(request: Request):
             "rateio": item["rateio"] if item else None,
             "cotas": item["cotas"] if item else [],
             "meses": item["meses"] if item else [],
+            "transferencias": item["transferencias"] if item else [],
             "mensagem": mensagem,
             "ano_atual": _dt.now().year,
             "mes_atual": _dt.now().month,
@@ -905,10 +948,49 @@ async def mover_saldo(request: Request):
 
     mover_credito(rateio_id, cota_id, origem_mes, origem_ano, destino_mes, destino_ano, valor)
 
-    # Recalcula todos os fechamentos em ordem cronológica para refletir a movimentação.
-    recalcular_fechamentos(rateio_id)
+    # Recalcula apenas do mês alterado (mais antigo entre origem/destino) em diante.
+    inicio = _mes_mais_antigo(origem_mes, origem_ano, destino_mes, destino_ano)
+    recalcular_fechamentos(rateio_id, a_partir_de=inicio)
 
     return RedirectResponse(
         url=f"/fechamentos?rateio_id={rateio_id}&mensagem=Saldo+movido+para+{destino_mes}/{destino_ano}",
+        status_code=303,
+    )
+
+
+@router.post("/fechamentos/remover-transferencia", response_class=HTMLResponse)
+async def remover_transferencia(request: Request):
+    usuario = exigir_login(request)
+    form = await request.form()
+    rateio_id = int(form.get("rateio_id", "0") or 0)
+    credito_id = int(form.get("credito_id", "0") or 0)
+
+    rateio = _rateio_do_organizador(usuario, rateio_id)
+    if not rateio or not credito_id:
+        return RedirectResponse(url=f"/fechamentos?rateio_id={rateio_id}", status_code=303)
+
+    credito = buscar_credito(credito_id)
+    if not credito:
+        return RedirectResponse(
+            url=f"/fechamentos?rateio_id={rateio_id}&mensagem=Transferencia+nao+encontrada",
+            status_code=303,
+        )
+
+    origem_mes = credito.origem_mes
+    origem_ano = credito.origem_ano
+    destino_mes = credito.destino_mes
+    destino_ano = credito.destino_ano
+
+    removido = remover_credito(credito_id)
+    if removido:
+        # Recalcula apenas do mês alterado (mais antigo entre origem/destino) em diante.
+        inicio = _mes_mais_antigo(origem_mes, origem_ano, destino_mes, destino_ano)
+        recalcular_fechamentos(rateio_id, a_partir_de=inicio)
+        mensagem = "Transferencia+removida+com+sucesso"
+    else:
+        mensagem = "Transferencia+nao+encontrada"
+
+    return RedirectResponse(
+        url=f"/fechamentos?rateio_id={rateio_id}&mensagem={mensagem}",
         status_code=303,
     )

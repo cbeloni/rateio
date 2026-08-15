@@ -3,18 +3,22 @@ from fastapi.templating import Jinja2Templates
 from dto.cobrar_request import CobrarRequest
 from repository.cobranca import (
     Cobranca,
-    buscar_por_cota,
     cobrancas_pendentes,
+    listar_por_cota_mes,
     marcar_status,
     marcar_status_whatsapp,
 )
-from repository.membro import membro_contato
+from repository.membro import buscar_por_id, membro_contato
 from service.email_service import enviar_email
 from service.whatsapp_service import enviar_cobranca_whatsapp
 
 
 def _membro_responsavel(cobranca):
-    """Retorna o membro responsável pela cota da cobrança (ou None)."""
+    """Retorna o membro responsável pela cobrança (membro_id) ou o contato da cota."""
+    if cobranca.membro_id:
+        membro = buscar_por_id(cobranca.membro_id)
+        if membro:
+            return membro
     if cobranca.cota_id:
         membro = membro_contato(cobranca.cota_id)
         if membro:
@@ -36,14 +40,18 @@ def _enviar_email(cobranca) -> bool:
     assunto = f'Cobrança {cobranca.cota} - {cobranca.mes}.{cobranca.ano}'
 
     membro = _membro_responsavel(cobranca)
+    if membro and not membro.receber_mensagens:
+        marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='nao_enviar', membro_id=cobranca.membro_id)
+        return False
+
     email = membro.email if membro and membro.email else 'cbeloni@gmail.com'
 
     try:
         enviar_email(subject=assunto, body=body, to_email=email)
-        marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='enviado')
+        marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='enviado', membro_id=cobranca.membro_id)
         return True
     except Exception:
-        marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha')
+        marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha', membro_id=cobranca.membro_id)
         return False
 
 
@@ -73,10 +81,16 @@ def _enviar_whatsapp(cobranca) -> bool:
     body = templates.env.get_template("whatsapp_template.txt").render(**context)
 
     membro = _membro_responsavel(cobranca)
+    if membro and not membro.receber_mensagens:
+        marcar_status_whatsapp(
+            mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='nao_enviar', membro_id=cobranca.membro_id
+        )
+        return False
+
     telefone = membro.telefone if membro else None
     if not telefone:
         marcar_status_whatsapp(
-            mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha'
+            mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha', membro_id=cobranca.membro_id
         )
         return False
 
@@ -88,12 +102,12 @@ def _enviar_whatsapp(cobranca) -> bool:
             pix_code=cobranca.brcode,
         )
         marcar_status_whatsapp(
-            mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='enviado'
+            mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='enviado', membro_id=cobranca.membro_id
         )
         return True
     except Exception:
         marcar_status_whatsapp(
-            mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha'
+            mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha', membro_id=cobranca.membro_id
         )
         return False
 
@@ -116,13 +130,18 @@ def cobrar_cota(mes, ano, cota_id) -> dict:
     Envio individual (botão "Cobrar"): NÃO valida se a mensagem já foi enviada
     antes, permitindo reenviar para a cota quantas vezes for necessário.
 
+    Com QRs por membro, envia uma cobrança para cada cobranca da cota.
+
     Retorna os canais utilizados: {"encontrada", "email", "whatsapp"}.
     """
-    cobranca = buscar_por_cota(mes, ano, cota_id)
-    if not cobranca:
+    cobrancas = listar_por_cota_mes(mes, ano, cota_id)
+    if not cobrancas:
         return {"encontrada": False, "email": False, "whatsapp": False}
 
-    email_ok = _enviar_email(cobranca)
-    whatsapp_ok = _enviar_whatsapp(cobranca)
+    email_ok = False
+    whatsapp_ok = False
+    for cobranca in cobrancas:
+        email_ok = _enviar_email(cobranca) or email_ok
+        whatsapp_ok = _enviar_whatsapp(cobranca) or whatsapp_ok
 
     return {"encontrada": True, "email": email_ok, "whatsapp": whatsapp_ok}

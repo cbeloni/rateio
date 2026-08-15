@@ -12,10 +12,20 @@ from repository.despesa import upsert as upsert_despesa
 from repository.extrato import ExtratoRepository
 from repository.membro import listar_por_rateio as listar_membros
 from repository.rateio import listar_todos
+from repository.responsabilidade import listar_por_rateio as listar_responsabilidades
 from service.drive_service import get_last_file_from_drive
 from service.qrcode_service import gerar_salvar_qrcode
-from service.rateio_service import cota_financiadora, valor_fundo_da_cota
+from service.rateio_service import cota_financiadora
 from util.datas_uteis import meses_portugues, normalizar_data_mysql, ultimo_dia_mes_atual
+
+
+def _valor_fixo_por_cota(categorias):
+    """Soma dos valores fixos por cota (categorias com valor_fixo preenchido)."""
+    total = Decimal("0.00")
+    for c in categorias:
+        if c.get("valor_fixo") is not None:
+            total += Decimal(str(c["valor_fixo"]))
+    return total
 
 
 def fechar_despesas(data_inicial, data_final, valida_mes, gerar_cobranca=True, rateio_id=None):
@@ -70,21 +80,21 @@ def fechar_despesas(data_inicial, data_final, valida_mes, gerar_cobranca=True, r
                     totais[categoria["id"]] += Decimal(str(resultado.valor))
                     break
 
+        n_ativas = len(cotas)
+        caixa_por_cota = _valor_fixo_por_cota(categorias)
+
+        # Categorias fixas (valor_fixo por cota) são obrigação mensal, não vêm do extrato.
         for categoria in categorias:
-            registro = upsert_despesa(
-                rateio_id,
-                mes,
-                ano,
-                categoria["id"],
-                -totais[categoria["id"]],
-            )
+            valor = -totais[categoria["id"]]
+            if categoria.get("valor_fixo") is not None:
+                valor += Decimal(str(categoria["valor_fixo"])) * n_ativas
+            registro = upsert_despesa(rateio_id, mes, ano, categoria["id"], valor)
             registros.append(registro)
 
         if not gerar_cobranca or not pode_gerar_qrcode:
             continue
 
-        total = -sum(totais.values())
-        n_ativas = len(cotas)
+        total = -sum(totais.values()) + (caixa_por_cota * n_ativas)
         parcela = (
             (total / n_ativas).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             if n_ativas
@@ -92,18 +102,19 @@ def fechar_despesas(data_inicial, data_final, valida_mes, gerar_cobranca=True, r
         )
 
         membros = listar_membros(rateio_id)
-        valor_fixo_por_cota = {}
-        for m in membros:
-            if m.get("valor_fixo"):
-                cid = m["cota_id"]
-                valor_fixo_por_cota[cid] = valor_fixo_por_cota.get(cid, Decimal("0.00")) + Decimal(str(m["valor_fixo"]))
+        responsabilidades = listar_responsabilidades(rateio_id)
+
+        resp_por_membro = {}
+        for r in responsabilidades:
+            resp_por_membro.setdefault(r["membro_id"], []).append(r["categoria_id"])
+
+        categorias_por_id = {c["id"]: c for c in categorias}
 
         financiadora_id = cota_financiadora(rateio_id, rateio.get("organizador_id"))
 
         for cota in cotas:
             identificador = cota["identificador"]
 
-            # A cota financiadora (do organizador) adiantou as despesas; não recebe cobrança.
             if financiadora_id is not None and cota["id"] == financiadora_id:
                 continue
 
@@ -120,39 +131,54 @@ def fechar_despesas(data_inicial, data_final, valida_mes, gerar_cobranca=True, r
                 )
                 continue
 
-            # O fundo entra na cobrança desta cota (valor padrão ou sobrescrito).
-            fundo_extra = valor_fundo_da_cota(rateio, cota)
-            # Abate apenas o valor fixo pago pelos membros da cota.
-            valor_fixo = valor_fixo_por_cota.get(cota["id"], Decimal("0.00"))
+            membros_da_cota = [m for m in membros if m["cota_id"] == cota["id"]]
+            principal = next((m for m in membros_da_cota if m.get("principal")), None)
+            if principal is None and membros_da_cota:
+                principal = membros_da_cota[0]
 
-            # QR = parcela + fundo - valor fixo.
-            amount = max(
-                (parcela - valor_fixo + fundo_extra).quantize(
-                    Decimal("0.01"), rounding=ROUND_HALF_UP
-                ),
-                Decimal("0.00"),
+            atribuido = Decimal("0.00")
+            for membro in membros_da_cota:
+                for categoria_id in resp_por_membro.get(membro["id"], []):
+                    categoria = categorias_por_id.get(categoria_id)
+                    if not categoria:
+                        continue
+                    if categoria.get("valor_fixo") is not None:
+                        valor = Decimal(str(categoria["valor_fixo"]))
+                    else:
+                        # Categoria do extrato: parcela da categoria na cota.
+                        valor = (
+                            (Decimal(str(-totais.get(categoria_id, Decimal("0.00")))) / n_ativas)
+                            .quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                        )
+                    if valor <= 0:
+                        continue
+                    atribuido += valor
+                    gerar_salvar_qrcode(
+                        mes=mes,
+                        ano=ano,
+                        cota=identificador,
+                        cota_id=cota["id"],
+                        membro_id=membro["id"],
+                        identification=f'M{membro["id"]}C{categoria_id}{mes}{ano}',
+                        description=f'Conta{identificador}{mes}{ano}',
+                        amount=valor,
+                        data_atual=normalizar_data_mysql(data_final),
+                    )
+
+            restante = (parcela - atribuido).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
             )
-
-            # Não gera QR Code quando não há valor a cobrar (coberto pelo valor fixo).
-            if amount <= 0:
-                logging.info(
-                    "Cota %s sem valor a cobrar (%s/%s) no rateio %s.",
-                    identificador,
-                    mes,
-                    ano,
-                    rateio_id,
+            if restante > 0 and principal:
+                gerar_salvar_qrcode(
+                    mes=mes,
+                    ano=ano,
+                    cota=identificador,
+                    cota_id=cota["id"],
+                    membro_id=principal["id"],
+                    identification=f'M{principal["id"]}P{mes}{ano}',
+                    description=f'Conta{identificador}{mes}{ano}',
+                    amount=restante,
+                    data_atual=normalizar_data_mysql(data_final),
                 )
-                continue
-
-            gerar_salvar_qrcode(
-                mes=mes,
-                ano=ano,
-                cota=identificador,
-                cota_id=cota["id"],
-                identification=f'{identificador}{mes}{ano}',
-                description=f'Conta{identificador}{mes}.{ano}',
-                amount=amount,
-                data_atual=normalizar_data_mysql(data_final),
-            )
 
     return {"rateios": len(rateios), "registros": len(registros), "dados": registros}

@@ -8,8 +8,8 @@ from repository.cota import listar_por_rateio as listar_cotas
 from repository.credito_cota import listar_por_rateio as listar_creditos
 from repository.despesa import listar_por_rateio as listar_despesas
 from repository.fechamento_cota import listar_por_rateio as listar_fechamentos
+from repository.membro import listar_por_rateio as listar_membros
 from repository.rateio import listar_por_membro, listar_por_organizador, listar_todos
-from service.rateio_service import valor_fundo_da_cota
 
 MESES_ORDEM = {
     "Janeiro": 1,
@@ -41,10 +41,13 @@ def montar_dashboard(usuario=None):
         cotas = [c for c in listar_cotas(rateio_id) if c.get("ativo")]
         categorias = listar_categorias(rateio_id)
 
-        cobrancas_map = {
-            (cb["mes"], cb["ano"], cb["cota_id"]): cb
-            for cb in listar_por_cotas([c["id"] for c in cotas])
-        }
+        # Agrupa TODAS as cobranças (por membro) de cada cota/mês.
+        cobrancas_map = {}
+        for cb in listar_por_cotas([c["id"] for c in cotas]):
+            cobrancas_map.setdefault((cb["mes"], cb["ano"], cb["cota_id"]), []).append(cb)
+
+        nome_membro = {m["id"]: m["nome"] for m in listar_membros(rateio_id)}
+        nome_cota = {c["id"]: c["identificador"] for c in cotas}
 
         nome_categoria = {c["id"]: c["nome"] for c in categorias}
 
@@ -85,6 +88,7 @@ def montar_dashboard(usuario=None):
         total_despesas_geral = Decimal("0.00")
         total_fundo_geral = Decimal("0.00")
         total_pagamentos_geral = Decimal("0.00")
+        total_pendente = Decimal("0.00")
         agora = datetime.now()
 
         for (mes, ano) in meses_keys:
@@ -102,12 +106,52 @@ def montar_dashboard(usuario=None):
                 enviado = creditos_movidos_map.get((cota["id"], mes, ano), Decimal("0.00"))
                 recebido = creditos_recebidos_map.get((cota["id"], mes, ano), Decimal("0.00"))
                 pagamentos_bruto = Decimal(str(dados.get("pagamentos", 0)))
-                cobranca = cobrancas_map.get((mes, ano, cota["id"]))
-                qr_url = (
-                    f"https://br-se1.magaluobjects.com/qrcodepix/{cobranca['url_qrcode']}"
-                    if cobranca and cobranca.get("url_qrcode")
-                    else None
-                )
+                cobrancas = cobrancas_map.get((mes, ano, cota["id"]), [])
+
+                # QRs da cota neste mês (um por membro, quando houver).
+                qrs = []
+                for cb in cobrancas:
+                    rotulo = nome_membro.get(cb.get("membro_id")) or cota["identificador"]
+                    qrs.append(
+                        {
+                            "valor": float(cb.get("valor") or 0),
+                            "brcode": cb.get("brcode") or "",
+                            "rotulo": rotulo,
+                            "qr_url": (
+                                f"https://br-se1.magaluobjects.com/qrcodepix/{cb['url_qrcode']}"
+                                if cb.get("url_qrcode")
+                                else None
+                            ),
+                        }
+                    )
+
+                # Transferências de saldo que afetam esta cota neste mês
+                # (origem = saiu deste mês; destino = entrou neste mês).
+                movimentacoes = []
+                for cr in creditos:
+                    if cr["cota_id"] != cota["id"]:
+                        continue
+                    if cr["origem_mes"] == mes and cr["origem_ano"] == ano:
+                        movimentacoes.append(
+                            {
+                                "id": cr["id"],
+                                "tipo": "origem",
+                                "outro_mes": cr["destino_mes"],
+                                "outro_ano": cr["destino_ano"],
+                                "valor": float(cr["valor"]),
+                            }
+                        )
+                    if cr["destino_mes"] == mes and cr["destino_ano"] == ano:
+                        movimentacoes.append(
+                            {
+                                "id": cr["id"],
+                                "tipo": "destino",
+                                "outro_mes": cr["origem_mes"],
+                                "outro_ano": cr["origem_ano"],
+                                "valor": float(cr["valor"]),
+                            }
+                        )
+
                 cota_linhas.append(
                     {
                         "id": cota["id"],
@@ -117,8 +161,8 @@ def montar_dashboard(usuario=None):
                         "fundo": dados.get("fundo", 0),
                         "saldo": dados.get("saldo", 0),
                         "transferido": float(recebido - enviado),
-                        "qr_url": qr_url,
-                        "cobranca_notificada": cobranca.get("notificacao_whatsapp") if cobranca else None,
+                        "movimentacoes": movimentacoes,
+                        "qrs": qrs,
                     }
                 )
 
@@ -131,13 +175,13 @@ def montar_dashboard(usuario=None):
             total_fundo_geral += total_fundo_mes
             total_pagamentos_geral += total_pagamentos_mes
 
-            # Valor pendente = soma do que cada cota ainda deve (parcela + fundo).
+            # Valor pendente = soma do que cada cota ainda não pagou (só o que falta).
             pendente_mes = Decimal("0.00")
             for cota in cotas:
                 linha = next((c for c in cota_linhas if c["id"] == cota["id"]), None)
                 pago = Decimal(str(linha["pagamentos_liquido"])) if linha else Decimal("0.00")
-                fundo_esperado = valor_fundo_da_cota(rateio, cota)
-                pendente_mes += max(parcela + fundo_esperado - pago, Decimal("0.00"))
+                pendente_mes += max(parcela - pago, Decimal("0.00"))
+            total_pendente += pendente_mes
 
             if ano == agora.year and MESES_ORDEM.get(mes, 0) == agora.month:
                 status = "em andamento"
@@ -161,8 +205,26 @@ def montar_dashboard(usuario=None):
                 }
             )
 
-        pendente = total_despesas_geral - (total_pagamentos_geral - total_fundo_geral)
-        saldo = total_fundo_geral - pendente
+        valor_inicial_caixa = Decimal(str(rateio.get("valor_inicial_caixa") or 0))
+        caixa_atual = (total_fundo_geral + valor_inicial_caixa).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        pendente = total_pendente.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        saldo = (caixa_atual - pendente).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        nome_por_cota = {c["id"]: c["identificador"] for c in cotas}
+        transferencias = [
+            {
+                "id": cr["id"],
+                "cota": nome_por_cota.get(cr["cota_id"], str(cr["cota_id"])),
+                "origem_mes": cr["origem_mes"],
+                "origem_ano": cr["origem_ano"],
+                "destino_mes": cr["destino_mes"],
+                "destino_ano": cr["destino_ano"],
+                "valor": float(cr["valor"]),
+            }
+            for cr in creditos
+        ]
 
         resultado.append(
             {
@@ -170,9 +232,11 @@ def montar_dashboard(usuario=None):
                 "cotas": cotas,
                 "categorias": categorias,
                 "meses": meses,
+                "transferencias": transferencias,
                 "totais": {
                     "total_despesas": float(total_despesas_geral),
                     "total_fundo": float(total_fundo_geral),
+                    "caixa_atual": float(caixa_atual),
                     "total_pagamentos": float(total_pagamentos_geral),
                     "pendente": float(pendente),
                     "saldo": float(saldo),
