@@ -113,20 +113,35 @@ def listar_por_rateio(rateio_id):
 
 
 def saldo_anterior(rateio_id, cota_id, excluir_mes=None, excluir_ano=None) -> Decimal:
-    """Retorna o saldo mais recente da cota antes do período informado."""
+    """Retorna o saldo do mês imediatamente anterior ao período informado.
+
+    Considera apenas meses cronologicamente anteriores ao mês informado. Assim,
+    ao sincronizar um mês isolado (ex.: Janeiro), o saldo anterior vem do mês
+    anterior (ou zero), e nunca de meses futuros — evitando "saldo excedente"
+    incorreto em meses com pagamento menor que a parcela.
+    """
     session = get_session()
-    query = session.query(FechamentoCota).filter(
-        FechamentoCota.rateio_id == rateio_id,
-        FechamentoCota.cota_id == cota_id,
-    )
-    if excluir_mes is not None and excluir_ano is not None:
-        query = query.filter(
-            ~((FechamentoCota.mes == excluir_mes) & (FechamentoCota.ano == excluir_ano))
+    registros = (
+        session.query(FechamentoCota)
+        .filter(
+            FechamentoCota.rateio_id == rateio_id,
+            FechamentoCota.cota_id == cota_id,
         )
-    registros = query.all()
+        .all()
+    )
     session.close()
+
+    if excluir_mes is not None and excluir_ano is not None:
+        ordem_atual = MESES_ORDEM.get(excluir_mes, 0)
+        registros = [
+            r for r in registros
+            if (r.ano or 0) < excluir_ano
+            or ((r.ano or 0) == excluir_ano and MESES_ORDEM.get(r.mes, 0) < ordem_atual)
+        ]
+
     if not registros:
         return Decimal("0.00")
+
     registros.sort(
         key=lambda r: (r.ano or 0, MESES_ORDEM.get(r.mes, 0), r.id or 0),
         reverse=True,
