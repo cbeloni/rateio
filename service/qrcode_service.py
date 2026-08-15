@@ -1,9 +1,10 @@
 from pypix.pix import Pix
 
 from dto.pix import PixRequest
-from repository.fechamento_despesas import FechamentoDespesas
+from repository.cobranca import Cobranca
 from service.bucket import enviar_base64
 from datetime import datetime
+
 
 def generate_qrcode(pix_data: PixRequest) -> dict:
     pix = Pix()
@@ -15,22 +16,20 @@ def generate_qrcode(pix_data: PixRequest) -> dict:
     pix.set_description(pix_data.description)
     pix.set_amount(pix_data.amount)
 
-    # print('\nDonation with defined amount - PYPIX >>>>\n', pix.get_br_code())
-    
     base64qr = pix.save_qrcode(
-        './qrcode.png',
-        color="black",
+        output='./qrcode.png',
         box_size=7,
         border=1,
     )
-      
+
     current_date = datetime.now().strftime("%Y%m%d%H%M%S")
     nome_arquivo = f"qrcode-{pix_data.identification}-{current_date}.png"
     enviar_base64("qrcodepix", base64qr.replace("data:image/png;base64,", ""), nome_arquivo, "image/png")
-    
+
     return {'qrcode': base64qr, 'br_code': pix.get_br_code(), 'nome_arquivo': nome_arquivo}
 
-def gerar_salvar_qrcode(mes, ano, apartamento, identification, description, amount, data_atual=None):
+
+def gerar_salvar_qrcode(mes, ano, cota, identification, description, amount, data_atual=None, cota_id=None):
     pix = PixRequest(
         name_receiver='Cauê Beloni',
         city_receiver='Santo André',
@@ -41,46 +40,15 @@ def gerar_salvar_qrcode(mes, ano, apartamento, identification, description, amou
         amount=amount
     )
     pix_response = generate_qrcode(pix)
-    fechamento_despesas = FechamentoDespesas(
-        mes=mes, 
-        ano=ano, 
-        apartamento=apartamento,
-        valor=amount, 
-        brcode=pix_response.get("br_code"), 
-        qrcode=pix_response.get("qrcode"), 
+    cobranca = Cobranca(
+        mes=mes,
+        ano=ano,
+        cota=cota,
+        cota_id=cota_id,
+        valor=amount,
+        brcode=pix_response.get("br_code"),
+        qrcode=pix_response.get("qrcode"),
         url_qrcode=pix_response.get("nome_arquivo"),
         data_atual=data_atual
     )
-    fechamento_despesas.save()
-
-
-# Exemplo de uso
-if __name__ == "__main__":
-    def normal_static():
-        pix = Pix()
-        pix.set_name_receiver('Cauê Beloni')
-        pix.set_city_receiver('Santo André')
-        pix.set_key('cbeloni@gmail.com')
-        pix.set_identification('12345')
-        pix.set_zipcode_receiver('09291250')
-        pix.set_description('condominio mensal')
-        pix.set_amount(1.0)
-
-        # print('\nDonation with defined amount - PYPIX >>>>\n', pix.get_br_code())
-        
-        base64qr = pix.save_qrcode(
-            './qrcode.png',
-            color="black",
-            box_size=7,
-            border=1,
-        )
-        
-        return {'qrcode': base64qr, 'br_code': pix.get_br_code()}
-
-        # pix.qr_ascii() 
-        # if base64qr:  # Imprime qrcode em fomato base64
-        #     print('Success in saving static QR-code.')
-        #     print(base64qr)
-        # else:
-        #     print('Error saving QR-code.')
-        normal_static()
+    cobranca.save()

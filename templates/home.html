@@ -2,148 +2,142 @@
 
 {% block content %}
 <div class="container-fluid px-0">
-    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-2">
-        <h2 class="h4 mb-0">Painel Financeiro</h2>
-        <span class="text-muted">Condomínio atualizado</span>
+    {% if not rateios %}
+    <div class="text-center py-5">
+        <div class="feature-icon">
+            <i class="fas fa-divide"></i>
+        </div>
+        <h2 class="h4 mb-2">Nenhum rateio cadastrado</h2>
+        <p class="text-muted mb-3">Crie seu primeiro rateio para começar a dividir as contas.</p>
+        <a href="/rateios" class="btn btn-success">
+            <i class="fas fa-plus me-1"></i>Criar rateio
+        </a>
     </div>
-    <ul class="nav nav-tabs" id="myTab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="despesas-tab" data-bs-toggle="tab" data-bs-target="#despesas" type="button" role="tab" aria-controls="despesas" aria-selected="true">Despesas</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="pagamentos-tab" data-bs-toggle="tab" data-bs-target="#pagamentos" type="button" role="tab" aria-controls="pagamentos" aria-selected="false">Pagamentos</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="caixa-tab" data-bs-toggle="tab" data-bs-target="#caixa" type="button" role="tab" aria-controls="caixa" aria-selected="false">Caixa</button>
-        </li>
-    </ul>
-    <div class="tab-content" id="myTabContent">
-        <div class="tab-pane fade show active pt-2" id="despesas" role="tabpanel" aria-labelledby="despesas-tab">
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th>Mês</th>
-                            <th>Ano</th>
-                            <th>Enel</th>
-                            <th>Sabesp</th>
-                            <th>Faxina</th>
-                            <th>Outros</th>
-                            <th>Total</th>
-                            <th>Valor Mensal AP1</th>
-                            <th>Valor Mensal AP2</th>
-                            <th>Valor Mensal AP3</th>
-                            <th>Valor Mensal AP4</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for despesa in despesas %}
-                        <tr>
-                            <td>{{ despesa.mes }}</td>
-                            <td>{{ despesa.ano }}</td>
-                            <td>{{ despesa.enel }}</td>
-                            <td>{{ despesa.sabesp }}</td>
-                            <td>{{ despesa.faxina }}</td>
-                            <td>{{ despesa.outros }}</td>
-                            <td>{{ despesa.total }}</td>
-                            <td>
-                                {{ despesa.valor_mensal_ap1 }}
-                                {% if despesa.caixa_ap1|default(0) > 99 %}
-                                    <i class="fa fa-check-circle check-icon" aria-hidden="true"></i>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {{ despesa.valor_mensal_ap2 }}
-                                {% if despesa.caixa_ap2|default(0) > 99 %}
-                                    <i class="fa fa-check-circle check-icon" aria-hidden="true"></i>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {{ despesa.valor_mensal_ap3 }}
-                                {% if despesa.caixa_ap3|default(0) > 99 %}
-                                    <i class="fa fa-check-circle check-icon" aria-hidden="true"></i>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {{ despesa.valor_mensal_ap4 }}
-                                {% if despesa.caixa_ap4|default(0) > 99 %}
-                                    <i class="fa fa-check-circle check-icon" aria-hidden="true"></i>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    {% endif %}
+
+    {% for item in rateios %}
+    <div class="mb-5">
+        <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-2">
+            <h2 class="h4 mb-0">{{ item.rateio.nome }}</h2>
+            <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-success" href="/categorias?rateio_id={{ item.rateio.id }}">
+                    <i class="fas fa-tags me-1"></i>Categorias
+                </a>
+                <a class="btn btn-sm btn-outline-success" href="/rateios/{{ item.rateio.id }}">
+                    <i class="fas fa-cog me-1"></i>Cotas
+                </a>
             </div>
         </div>
-        <div class="tab-pane fade pt-2" id="pagamentos" role="tabpanel" aria-labelledby="pagamentos-tab">
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th>Mês</th>
-                            <th>Ano</th>
-                            <th>Pagamentos AP1</th>
-                            <th>Pagamentos AP2</th>
-                            <th>Pagamentos AP3</th>
-                            <th>Pagamentos AP4</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for despesa in despesas %}
-                        <tr>
-                            <td>{{ despesa.mes }}</td>
-                            <td>{{ despesa.ano }}</td>
-                            <td>{{ despesa.pagamentos_ap1 }}</td>
-                            <td>{{ despesa.pagamentos_ap2 }}</td>
-                            <td>{{ despesa.pagamentos_ap3 }}</td>
-                            <td>{{ despesa.pagamentos_ap4 }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+        <ul class="nav nav-tabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#despesas-{{ item.rateio.id }}" type="button" role="tab">Despesas</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pagamentos-{{ item.rateio.id }}" type="button" role="tab">Pagamentos</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#fundo-{{ item.rateio.id }}" type="button" role="tab">Fundo</button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active pt-2" id="despesas-{{ item.rateio.id }}" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Mês</th>
+                                <th>Ano</th>
+                                {% for categoria in item.categorias %}<th>{{ categoria.nome }}</th>{% endfor %}
+                                <th class="fw-bold">Total</th>
+                                <th class="fw-bold">Parcela</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mes in item.meses %}
+                            <tr>
+                                <td>{{ mes.mes }}</td>
+                                <td>{{ mes.ano }}</td>
+                                {% for categoria in item.categorias %}
+                                <td>{{ mes.despesas.get(categoria.nome, 0) }}</td>
+                                {% endfor %}
+                                <td class="fw-bold">{{ '%.2f'|format(mes.total) }}</td>
+                                <td class="fw-bold">{{ '%.2f'|format(mes.parcela) }}</td>
+                                <td>
+                                    {% if mes.status == 'correto' %}
+                                    <span class="badge bg-success" title="Correto"><i class="fas fa-check-circle"></i></span>
+                                    {% elif mes.status == 'atraso' %}
+                                    <span class="badge bg-danger" title="Atraso"><i class="fas fa-exclamation-circle"></i></span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark" title="Em andamento"><i class="fas fa-hourglass-half"></i></span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade pt-2" id="pagamentos-{{ item.rateio.id }}" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Mês</th>
+                                <th>Ano</th>
+                                {% for cota in item.cotas %}<th>{{ cota.identificador }}</th>{% endfor %}
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mes in item.meses %}
+                            <tr>
+                                <td>{{ mes.mes }}</td>
+                                <td>{{ mes.ano }}</td>
+                                {% for cota in mes.cotas %}<td>{{ '%.2f'|format(cota.pagamentos_liquido) }}</td>{% endfor %}
+                                <td>{{ '%.2f'|format(mes.total_pagamentos_liquido) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade pt-2" id="fundo-{{ item.rateio.id }}" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Mês</th>
+                                <th>Ano</th>
+                                {% for cota in item.cotas %}<th>{{ cota.identificador }}</th>{% endfor %}
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for mes in item.meses %}
+                            <tr>
+                                <td>{{ mes.mes }}</td>
+                                <td>{{ mes.ano }}</td>
+                                {% for cota in mes.cotas %}<td>{{ cota.fundo }}</td>{% endfor %}
+                                <td>{{ mes.total_fundo }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-        <div class="tab-pane fade pt-2" id="caixa" role="tabpanel" aria-labelledby="caixa-tab">
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th>Mês</th>
-                            <th>Ano</th>
-                            <th>Caixa AP1</th>
-                            <th>Caixa AP2</th>
-                            <th>Caixa AP3</th>
-                            <th>Caixa AP4</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for despesa in despesas %}
-                        <tr>
-                            <td>{{ despesa.mes }}</td>
-                            <td>{{ despesa.ano }}</td>
-                            <td>{{ despesa.caixa_ap1 }}</td>
-                            <td>{{ despesa.caixa_ap2 }}</td>
-                            <td>{{ despesa.caixa_ap3 }}</td>
-                            <td>{{ despesa.caixa_ap4 }}</td>
-                            <td>{{ despesa.caixa_total }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    <section class="mt-4">
-        <div class="container px-0">
+
+        <section class="mt-4">
             <div class="row g-4">
                 <div class="col-md-4">
-                    <div class="feature-card text-center">    
+                    <div class="feature-card text-center">
                         <div class="feature-icon">
                             <i class="fas fa-credit-card"></i>
                         </div>
-                        <h4 class="metric-value">R$ {{ pendente_pagamento }}</h4>
+                        <h4 class="metric-value">R$ {{ item.totais.pendente }}</h4>
                         <p class="metric-label mb-0">Despesas pendentes de pagamento</p>
                     </div>
                 </div>
@@ -152,9 +146,8 @@
                         <div class="feature-icon">
                             <i class="fas fa-university"></i>
                         </div>
-                        <h4 class="metric-value">R$ {{ total_caixa }}</h4>
-                        <p class="metric-label mb-1">Caixa atual</p>
-                        <p class="small text-muted mb-0">Caixa anos anteriores: <b>R$ 6220.00</b></p>
+                        <h4 class="metric-value">R$ {{ item.totais.total_fundo }}</h4>
+                        <p class="metric-label mb-0">Fundo atual</p>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -162,12 +155,13 @@
                         <div class="feature-icon">
                             <i class="fas fa-money-bill-alt"></i>
                         </div>
-                        <h4 class="metric-value">R$ {{saldo}}</h4>
-                        <p class="metric-label mb-0">Saldo atual para 2025</p>
+                        <h4 class="metric-value">R$ {{ item.totais.saldo }}</h4>
+                        <p class="metric-label mb-0">Saldo</p>
                     </div>
                 </div>
             </div>
-        </div>
-    </section> 
+        </section>
+    </div>
+    {% endfor %}
 </div>
 {% endblock %}

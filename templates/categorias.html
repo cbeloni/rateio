@@ -1,0 +1,127 @@
+{% extends "template.html" %}
+
+{% block content %}
+{% if request.query_params.get('mensagem') %}
+<div class="alert alert-success py-2" role="alert">
+    <i class="fas fa-check-circle me-2"></i>{{ request.query_params.get('mensagem') }}
+</div>
+{% endif %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h2 class="h4 mb-1">Categorias de despesa</h2>
+        <p class="text-muted mb-0">Customize categorias e seus identificadores do extrato</p>
+    </div>
+</div>
+
+{% if rateios %}
+<div class="mb-3">
+    <form method="get" action="/categorias" class="d-flex gap-2 align-items-center">
+        <label class="form-label mb-0">Rateio:</label>
+        <select class="form-select w-auto" name="rateio_id" onchange="this.form.submit()">
+            {% for r in rateios %}
+            <option value="{{ r.id }}" {% if rateio and r.id == rateio.id %}selected{% endif %}>{{ r.nome }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+{% endif %}
+
+{% if rateio %}
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="feature-card">
+            <h3 class="h6 mb-3">Categorias de {{ rateio.nome }}</h3>
+            {% if categorias %}
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Identificadores</th>
+                            <th>Ordem</th>
+                            <th>Ativa</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for categoria in categorias %}
+                        <tr>
+                            <td class="fw-bold">{{ categoria.nome }}</td>
+                            <td><small>{{ categoria.identificadores|join(', ') }}</small></td>
+                            <td>{{ categoria.ordem }}</td>
+                            <td>{{ 'Sim' if categoria.ativo else 'Não' }}</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#cat-{{ categoria.id }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="collapse" id="cat-{{ categoria.id }}">
+                            <td colspan="5">
+                                <form method="post" action="/categorias/{{ categoria.id }}" class="row g-2">
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control form-control-sm" name="nome" value="{{ categoria.nome }}" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control form-control-sm" name="cor" value="{{ categoria.cor or '' }}" placeholder="Cor (hex)">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="number" class="form-control form-control-sm" name="ordem" value="{{ categoria.ordem }}">
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-center">
+                                        <input class="form-check-input me-1" type="checkbox" name="ativo" id="cat-ativo-{{ categoria.id }}" {% if categoria.ativo %}checked{% endif %}>
+                                        <label class="form-check-label small" for="cat-ativo-{{ categoria.id }}">Ativa</label>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <input type="text" class="form-control form-control-sm" name="identificadores" value="{{ categoria.identificadores|join(', ') }}" placeholder="Identificadores separados por vírgula">
+                                    </div>
+                                    <div class="col-md-4 text-end">
+                                        <button type="submit" class="btn btn-sm btn-success">Salvar</button>
+                                    </div>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Nenhuma categoria cadastrada.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if usuario.perfil == 'organizador' %}
+    <div class="col-lg-5">
+        <form class="feature-card" method="post" action="/categorias">
+            <h3 class="h6 mb-3">Nova categoria</h3>
+            <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+            <div class="mb-3">
+                <label class="form-label">Nome</label>
+                <input type="text" class="form-control" name="nome" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Identificadores (separados por vírgula)</label>
+                <input type="text" class="form-control" name="identificadores" placeholder="enel, light, energia">
+            </div>
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label">Cor (hex)</label>
+                    <input type="text" class="form-control" name="cor" placeholder="#1f6f4a">
+                </div>
+                <div class="col-6">
+                    <label class="form-label">Ordem</label>
+                    <input type="number" class="form-control" name="ordem" value="0">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-success w-100">
+                <i class="fas fa-plus me-1"></i>Adicionar categoria
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<p class="text-muted">Nenhum rateio disponível.</p>
+{% endif %}
+{% endblock %}

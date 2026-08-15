@@ -54,7 +54,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: cbeloni/auto-sindico:amd64
+          tags: cbeloni/rateio-online:amd64
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -75,5 +75,5 @@ jobs:
 
       - name: Apply Kubernetes manifests
         run: |          
-          kubectl apply -f argocd-amd/auto-sindico-amd.yaml --validate=false
-          kubectl rollout restart deployment/auto-sindico
+          kubectl apply -f argocd-amd/rateio-online-amd.yaml --validate=false
+          kubectl rollout restart deployment/rateio-online

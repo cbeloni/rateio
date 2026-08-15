@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: auto-sindico-svc
+  name: rateio-online-svc
 spec:
   type: ClusterIP
   selector:
-    app: auto-sindico
+    app: rateio-online
   ports:
     - protocol: TCP
       port: 80
@@ -15,28 +15,28 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: auto-sindico-http
+  name: rateio-online-http
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: "web"
 spec:
   rules:
-    - host: auto-sindico-staging.192.168.0.201.sslip.io
+    - host: rateio-online.201.23.17.249.sslip.io
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: auto-sindico-svc
+                name: rateio-online-svc
                 port:
                   number: 80
-    - host: auto-sindico-staging.beloni.dev.br
+    - host: rateio-online.beloni.dev.br
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: auto-sindico-svc
+                name: rateio-online-svc
                 port:
                   number: 80

@@ -1,0 +1,161 @@
+{% extends "template.html" %}
+
+{% block content %}
+{% if request.query_params.get('mensagem') %}
+<div class="alert alert-success py-2" role="alert">
+    <i class="fas fa-check-circle me-2"></i>{{ request.query_params.get('mensagem') }}
+</div>
+{% endif %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h2 class="h4 mb-1">{{ rateio.nome }}</h2>
+        <p class="text-muted mb-0">
+            {{ rateio.descricao or 'Sem descrição' }} · Fundo padrão R$ {{ rateio.valor_fundo_padrao }}
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-sm btn-outline-secondary" href="/rateios">
+            <i class="fas fa-arrow-left me-1"></i>Voltar
+        </a>
+        {% if usuario.perfil == 'organizador' %}
+        <form method="post" action="/rateios/{{ rateio.id }}/remover"
+              onsubmit="return confirm('Desativar o rateio {{ rateio.nome }}? Ele deixará de aparecer nas telas e nos fechamentos.');">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="fas fa-ban me-1"></i>Desativar rateio
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+{% if usuario.perfil == 'organizador' %}
+<div class="feature-card mb-4">
+    <h3 class="h6 mb-3">Configuração do rateio</h3>
+    <form method="post" action="/rateios/{{ rateio.id }}" class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label">Nome</label>
+            <input type="text" class="form-control" name="nome" value="{{ rateio.nome }}" required>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Descrição (opcional)</label>
+            <input type="text" class="form-control" name="descricao" value="{{ rateio.descricao or '' }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Fundo padrão (R$)</label>
+            <input type="number" step="0.01" class="form-control" name="valor_fundo_padrao" value="{{ rateio.valor_fundo_padrao }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Dia do fechamento</label>
+            <select class="form-select" name="dia_fechamento">
+                <option value="0" {% if not rateio.dia_fechamento %}selected{% endif %}>Último dia do mês</option>
+                {% for d in range(1, 29) %}
+                <option value="{{ d }}" {% if rateio.dia_fechamento == d %}selected{% endif %}>Dia {{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Pluggy Client ID</label>
+            <input type="text" class="form-control" name="pluggy_client_id" value="{{ rateio.pluggy_client_id or '' }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Pluggy Client Secret</label>
+            <input type="password" class="form-control" name="pluggy_client_secret" value="{{ rateio.pluggy_client_secret or '' }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Pluggy Account ID</label>
+            <input type="text" class="form-control" name="pluggy_account_id" value="{{ rateio.pluggy_account_id or '' }}">
+        </div>
+        <div class="col-12 text-end">
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-save me-1"></i>Salvar configuração
+            </button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="feature-card">
+            <h3 class="h6 mb-3">Cotas</h3>
+            {% if cotas %}
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Identificador</th>
+                            <th>Descrição</th>
+                            <th>Fundo (R$)</th>
+                            <th>Membros</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cota in cotas %}
+                        <tr>
+                            <td class="fw-bold">{{ cota.identificador }}</td>
+                            <td>{{ cota.descricao or '-' }}</td>
+                            <td>{{ cota.valor_fundo if cota.valor_fundo is not none else '(padrão)' }}</td>
+                            <td>{{ cota.membros|length }}</td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-success" href="/cotas/{{ cota.id }}">
+                                    <i class="fas fa-cog"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Nenhuma cota cadastrada.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if usuario.perfil == 'organizador' %}
+    <div class="col-lg-4">
+        <form class="feature-card" method="post" action="/cotas">
+            <h3 class="h6 mb-3">Nova cota</h3>
+            <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+            <div class="mb-3">
+                <label class="form-label">Identificador</label>
+                <input type="text" class="form-control" name="identificador" placeholder="AP1, João, Quarto 1" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Descrição (opcional)</label>
+                <input type="text" class="form-control" name="descricao">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Valor do fundo (R$, vazio = padrão)</label>
+                <input type="number" step="0.01" class="form-control" name="valor_fundo">
+            </div>
+            <button type="submit" class="btn btn-success w-100">
+                <i class="fas fa-plus me-1"></i>Adicionar
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="mt-4">
+    <div class="feature-card">
+        <h3 class="h6 mb-3">Categorias de despesa</h3>
+        {% if categorias %}
+        <div class="d-flex flex-wrap gap-2">
+            {% for categoria in categorias %}
+            <span class="badge rounded-pill bg-success bg-opacity-10 text-dark border px-3 py-2">
+                {{ categoria.nome }}
+                <small class="text-muted ms-1">({{ categoria.identificadores|join(', ') }})</small>
+            </span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Nenhuma categoria cadastrada.</p>
+        {% endif %}
+        <a class="btn btn-sm btn-outline-success mt-3" href="/categorias?rateio_id={{ rateio.id }}">
+            <i class="fas fa-tags me-1"></i>Gerenciar categorias
+        </a>
+    </div>
+</div>
+{% endblock %}

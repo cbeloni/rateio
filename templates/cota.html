@@ -1,0 +1,154 @@
+{% extends "template.html" %}
+
+{% block content %}
+{% if request.query_params.get('mensagem') %}
+<div class="alert alert-success py-2" role="alert">
+    <i class="fas fa-check-circle me-2"></i>{{ request.query_params.get('mensagem') }}
+</div>
+{% endif %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h2 class="h4 mb-1">Cota {{ cota.identificador }}</h2>
+        <p class="text-muted mb-0">{{ rateio.nome }}</p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="/rateios/{{ rateio.id }}">
+        <i class="fas fa-arrow-left me-1"></i>Voltar
+    </a>
+</div>
+
+<div class="feature-card mb-4">
+    <h3 class="h6 mb-3">Configuração</h3>
+    <form method="post" action="/cotas/{{ cota.id }}" class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label">Identificador</label>
+            <input type="text" class="form-control" name="identificador" value="{{ cota.identificador }}" required>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Descrição (opcional)</label>
+            <input type="text" class="form-control" name="descricao" value="{{ cota.descricao or '' }}">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Valor do fundo (R$, vazio = padrão do rateio)</label>
+            <input type="number" step="0.01" class="form-control" name="valor_fundo" value="{{ cota.valor_fundo if cota.valor_fundo is not none else '' }}">
+        </div>
+        <div class="col-12 d-flex align-items-center gap-3">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" name="ativo" id="ativo" {% if cota.ativo %}checked{% endif %}>
+                <label class="form-check-label" for="ativo">Cota ativa</label>
+            </div>
+            <button type="submit" class="btn btn-success ms-auto">
+                <i class="fas fa-save me-1"></i>Salvar configuração
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="feature-card">
+    <h3 class="h6 mb-3">Membros vinculados</h3>
+            {% if membros %}
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>E-mail</th>
+                            <th>Telefone</th>
+                            <th>Valor fixo (R$)</th>
+                            <th>Identificadores</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for membro in membros %}
+                        <tr>
+                            <td class="fw-bold">{{ membro.nome }}</td>
+                            <td>{{ membro.email or '-' }}</td>
+                            <td>{{ membro.telefone or '-' }}</td>
+                            <td>{{ '%.2f'|format(membro.valor_fixo) if membro.valor_fixo is not none else '-' }}</td>
+                            <td><small>{{ membro.identificadores_pagamento|join(', ') }}</small></td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#membro-{{ membro.id }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="collapse" id="membro-{{ membro.id }}">
+                            <td colspan="6">
+                                <form method="post" action="/membros/{{ membro.id }}" class="row g-2">
+                                    <div class="col-md-3">
+                                        <label class="form-label small">Nome</label>
+                                        <input type="text" class="form-control form-control-sm" name="nome" value="{{ membro.nome }}" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">E-mail</label>
+                                        <input type="email" class="form-control form-control-sm" name="email" value="{{ membro.email or '' }}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">Telefone</label>
+                                        <input type="text" class="form-control form-control-sm" name="telefone" value="{{ membro.telefone or '' }}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">Valor fixo (R$)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm" name="valor_fixo" value="{{ membro.valor_fixo or '' }}">
+                                        <div class="form-text">Pago todo mês; descontado do QR Code da cota.</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">Senha inicial</label>
+                                        <input type="password" class="form-control form-control-sm" name="senha_inicial" placeholder="Opcional">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small">Identificadores de pagamento</label>
+                                        <input type="text" class="form-control form-control-sm" name="identificadores" value="{{ membro.identificadores_pagamento|join(', ') }}">
+                                    </div>
+                                    <div class="col-12 text-end">
+                                        <button type="submit" class="btn btn-sm btn-success">Salvar</button>
+                                    </div>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Nenhum membro vinculado ainda.</p>
+            {% endif %}
+
+            <hr class="my-4">
+
+            <h3 class="h6 mb-3">Adicionar membro</h3>
+            <form method="post" action="/membros" class="row g-2">
+                <input type="hidden" name="cota_id" value="{{ cota.id }}">
+                <div class="col-md-4">
+                    <label class="form-label small">Nome</label>
+                    <input type="text" class="form-control" name="nome" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">E-mail</label>
+                    <input type="email" class="form-control" name="email">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Telefone</label>
+                    <input type="text" class="form-control" name="telefone">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Valor fixo (R$)</label>
+                    <input type="number" step="0.01" class="form-control" name="valor_fixo">
+                    <div class="form-text">Pago todo mês; descontado do QR Code da cota.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Senha inicial (opcional)</label>
+                    <input type="password" class="form-control" name="senha_inicial">
+                </div>
+                <div class="col-12">
+                    <label class="form-label small">Identificadores de pagamento (separados por vírgula)</label>
+                    <input type="text" class="form-control" name="identificadores">
+                </div>
+                <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-user-plus me-1"></i>Adicionar
+                    </button>
+                </div>
+            </form>
+        </div>
+{% endblock %}

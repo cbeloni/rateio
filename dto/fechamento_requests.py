@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from repository.fechamento_despesas import get_last_fechamento_despesas
+from repository.cobranca import get_last_cobranca
 from util.datas_uteis import first_day_of_current_month, last_day_of_current_month, last_day_of_previous_month
 
 class FechamentoRequest(BaseModel):
@@ -12,7 +12,7 @@ class FechamentoRequest(BaseModel):
 
 class FechamentoPagamentosDate():
     def __init__(self):
-        ultimo_fechamento = get_last_fechamento_despesas()
+        ultimo_fechamento = get_last_cobranca()
         data_atual = getattr(ultimo_fechamento, "data_atual", None) if ultimo_fechamento else None
         logging.info(f"Data atual do último fechamento de despesas: {data_atual}")
 

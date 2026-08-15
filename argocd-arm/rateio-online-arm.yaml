@@ -2,21 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: auto-sindico
-  name: auto-sindico
+    app: rateio-online
+  name: rateio-online
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: auto-sindico
+      app: rateio-online
   template:
     metadata:
       labels:
-        app: auto-sindico
+        app: rateio-online
     spec:
       containers:
-        - image: cbeloni/auto-sindico:amd64
+        - image: cbeloni/rateio-online:arm64
           imagePullPolicy: Always
-          name: auto-sindico
+          name: rateio-online
           ports:
             - containerPort: 8000

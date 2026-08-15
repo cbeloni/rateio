@@ -1,0 +1,226 @@
+{% extends "template.html" %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h2 class="h4 mb-1">Fechamentos</h2>
+        <p class="text-muted mb-0">Feche o mês, sincronize pagamentos e mova saldos excedentes</p>
+    </div>
+</div>
+
+{% if mensagem %}
+<div class="alert alert-success py-2" role="alert">
+    <i class="fas fa-check-circle me-2"></i>{{ mensagem }}
+</div>
+{% endif %}
+
+{% if rateios %}
+<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+    <form method="get" action="/fechamentos" class="d-flex gap-2 align-items-center">
+        <label class="form-label mb-0">Rateio:</label>
+        <select class="form-select w-auto" name="rateio_id" onchange="this.form.submit()">
+            {% for r in rateios %}
+            <option value="{{ r.id }}" {% if rateio and r.id == rateio.id %}selected{% endif %}>{{ r.nome }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+{% endif %}
+
+{% if rateio %}
+<div class="feature-card mb-4">
+    <h3 class="h6 mb-3">Período de referência</h3>
+    <form id="fechamento-form" method="post" action="/fechamentos/fechar" class="row g-3 align-items-end">
+        <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+        <div class="col-md-3">
+            <label class="form-label small">Mês</label>
+            <select class="form-select" name="mes">
+                {% for n in range(1, 13) %}
+                <option value="{{ n }}" {% if n == mes_atual %}selected{% endif %}>{{ meses_nome[n - 1] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small">Ano</label>
+            <input type="number" class="form-control" name="ano" value="{{ ano_atual }}">
+        </div>
+    </form>
+
+    <hr class="my-3">
+
+    <div class="row g-3">
+        <div class="col-lg-3">
+            <div class="border rounded p-3 h-100 d-flex flex-column">
+                <h4 class="h6 mb-1">
+                    <i class="fas fa-clipboard-check me-1 text-success"></i>Fechar mês
+                </h4>
+                <p class="small text-muted mb-3">
+                    Calcula as despesas e pagamentos do mês, sem gerar cobranças.
+                </p>
+                <button type="submit" form="fechamento-form" formaction="/fechamentos/fechar" class="btn btn-success w-100 mt-auto">
+                    <i class="fas fa-clipboard-check me-1"></i>Fechar mês
+                </button>
+            </div>
+        </div>
+        <div class="col-lg-3">
+            <div class="border rounded p-3 h-100 d-flex flex-column">
+                <h4 class="h6 mb-1">
+                    <i class="fas fa-qrcode me-1 text-success"></i>Gerar QR Code
+                </h4>
+                <p class="small text-muted mb-3">
+                    Gera os QR Codes de pagamento das cotas para o mês selecionado.
+                </p>
+                <button type="submit" form="fechamento-form" formaction="/fechamentos/gerar-cobranca" class="btn btn-warning w-100 mt-auto">
+                    <i class="fas fa-qrcode me-1"></i>Gerar QR Code
+                </button>
+            </div>
+        </div>
+        <div class="col-lg-3">
+            <div class="border rounded p-3 h-100 d-flex flex-column">
+                <h4 class="h6 mb-1">
+                    <i class="fas fa-paper-plane me-1 text-success"></i>Enviar cobranças
+                </h4>
+                <p class="small text-muted mb-3">
+                    Envia a mensagem com o QR Code para as cotas efetuarem o pagamento.
+                </p>
+                <button type="submit" form="fechamento-form" formaction="/fechamentos/enviar-cobrancas" class="btn btn-success w-100 mt-auto">
+                    <i class="fas fa-paper-plane me-1"></i>Enviar cobranças
+                </button>
+            </div>
+        </div>
+        <div class="col-lg-3">
+            <div class="border rounded p-3 h-100 d-flex flex-column">
+                <h4 class="h6 mb-1">
+                    <i class="fas fa-sync-alt me-1 text-success"></i>Sincronizar pagamentos
+                </h4>
+                <p class="small text-muted mb-3">
+                    Lê os créditos do extrato e atualiza pagamentos, fundo e saldo de cada cota,
+                    sem gerar cobranças.
+                </p>
+                <button type="submit" form="fechamento-form" formaction="/fechamentos/sincronizar" class="btn btn-outline-success w-100 mt-auto">
+                    <i class="fas fa-sync-alt me-1"></i>Sincronizar pagamentos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if meses %}
+{% for mes in meses %}
+<div class="feature-card mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h3 class="h6 mb-0">{{ mes.mes }} / {{ mes.ano }}</h3>
+        <span class="small text-muted">
+            Total despesas R$ {{ mes.total }} · Parcela R$ {{ mes.parcela }}
+        </span>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Cota</th>
+                    <th class="text-end">Parcela</th>
+                    <th class="text-end">Pagamentos</th>
+                    <th class="text-end">Fundo</th>
+                    <th class="text-end">Transferido</th>
+                    <th class="text-center">QR / Cobrar</th>
+                    <th class="text-end">Saldo</th>
+                    <th style="min-width: 260px;">Mover saldo excedente</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cota in mes.cotas %}
+                <tr>
+                    <td class="fw-bold">{{ cota.identificador }}</td>
+                    <td class="text-end">{{ '%.2f'|format(mes.parcela) }}</td>
+                    <td class="text-end">{{ '%.2f'|format(cota.pagamentos) }}</td>
+                    <td class="text-end">{{ '%.2f'|format(cota.fundo) }}</td>
+                    <td class="text-end {{ 'text-success' if cota.transferido > 0 else ('text-danger' if cota.transferido < 0 else 'text-muted') }}">
+                        {% if cota.transferido > 0 %}+{{ '%.2f'|format(cota.transferido) }}
+                        {% elif cota.transferido < 0 %}{{ '%.2f'|format(cota.transferido) }}
+                        {% else %}0.00{% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if cota.qr_url %}
+                        <div class="d-flex align-items-center justify-content-center gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#qrModal" data-qr="{{ cota.qr_url }}" title="Ver QR Code"><i class="fas fa-qrcode"></i></button>
+                            <form method="post" action="/fechamentos/cobrar-cota" class="d-inline">
+                                <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+                                <input type="hidden" name="cota_id" value="{{ cota.id }}">
+                                <input type="hidden" name="mes" value="{{ mes.mes }}">
+                                <input type="hidden" name="ano" value="{{ mes.ano }}">
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Disparar cobrança"><i class="fas fa-paper-plane"></i></button>
+                            </form>
+                        </div>
+                        {% else %}
+                        <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold {{ 'text-success' if cota.saldo > 0 else '' }}">{{ '%.2f'|format(cota.saldo) }}</td>
+                    <td>
+                        {% if cota.saldo > 0 %}
+                        <form method="post" action="/fechamentos/mover-saldo" class="d-flex align-items-center gap-2">
+                            <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+                            <input type="hidden" name="cota_id" value="{{ cota.id }}">
+                            <input type="hidden" name="origem_mes" value="{{ mes.mes }}">
+                            <input type="hidden" name="origem_ano" value="{{ mes.ano }}">
+                            <input type="number" step="0.01" class="form-control form-control-sm w-auto" name="valor" value="{{ '%.2f'|format(cota.saldo) }}">
+                            <select class="form-select form-select-sm w-auto" name="destino">
+                                {% for m in meses %}
+                                {% if not (m.mes == mes.mes and m.ano == mes.ano) %}
+                                <option value="{{ m.mes }}|{{ m.ano }}">{{ m.mes }}/{{ m.ano }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">
+                                Mover saldo
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<p class="text-muted">Nenhum fechamento encontrado. Use "Fechar mês" para gerar o primeiro.</p>
+{% endif %}
+{% else %}
+<p class="text-muted">Nenhum rateio disponível.</p>
+{% endif %}
+
+<div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">QR Code</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="qrModalImage" src="" class="img-fluid" alt="QR Code">
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var modal = document.getElementById('qrModal');
+    if (modal) {
+        // Move o modal para o body. O .content-shell usa backdrop-filter, que cria
+        // um novo contexto de posicionamento e quebra o position: fixed do modal,
+        // fazendo ele ficar escondido/clipado atrás do overlay.
+        document.body.appendChild(modal);
+
+        modal.addEventListener('show.bs.modal', function (event) {
+            var btn = event.relatedTarget;
+            document.getElementById('qrModalImage').src = btn.getAttribute('data-qr');
+        });
+    }
+});
+</script>
+{% endblock %}

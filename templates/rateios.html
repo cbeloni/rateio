@@ -1,0 +1,105 @@
+{% extends "template.html" %}
+
+{% block content %}
+{% if request.query_params.get('mensagem') %}
+<div class="alert alert-success py-2" role="alert">
+    <i class="fas fa-check-circle me-2"></i>{{ request.query_params.get('mensagem') }}
+</div>
+{% endif %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h2 class="h4 mb-1">Rateios</h2>
+        <p class="text-muted mb-0">Rateios que você organiza ou participa</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="feature-card">
+            <h3 class="h6 mb-3">Seus rateios</h3>
+            {% if rateios %}
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Descrição</th>
+                            <th>Fundo padrão</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rateio in rateios %}
+                        <tr>
+                            <td class="fw-bold">{{ rateio.nome }}</td>
+                            <td>{{ rateio.descricao or '-' }}</td>
+                            <td>R$ {{ rateio.valor_fundo_padrao }}</td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-success" href="/rateios/{{ rateio.id }}">
+                                    <i class="fas fa-users me-1"></i>Cotas
+                                </a>
+                                {% if usuario.perfil == 'organizador' %}
+                                <form method="post" action="/rateios/{{ rateio.id }}/remover" class="d-inline"
+                                      onsubmit="return confirm('Desativar o rateio {{ rateio.nome }}? Ele deixará de aparecer nas telas e nos fechamentos.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Desativar rateio">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Nenhum rateio cadastrado ainda.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if usuario.perfil == 'organizador' %}
+    <div class="col-lg-5">
+        <form class="feature-card" method="post" action="/rateios">
+            <h3 class="h6 mb-3">Novo rateio</h3>
+            <div class="mb-3">
+                <label class="form-label">Nome</label>
+                <input type="text" class="form-control" name="nome" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Descrição (opcional)</label>
+                <input type="text" class="form-control" name="descricao" placeholder="Ex.: Condomínio Jardim, Viagem Floripa">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Valor padrão do fundo (R$)</label>
+                <input type="number" step="0.01" class="form-control" name="valor_fundo_padrao" value="0.00">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Dia do fechamento</label>
+                <select class="form-select" name="dia_fechamento">
+                    <option value="0">Último dia do mês</option>
+                    {% for d in range(1, 29) %}
+                    <option value="{{ d }}">Dia {{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Pluggy Client ID (opcional)</label>
+                <input type="text" class="form-control" name="pluggy_client_id">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Pluggy Client Secret (opcional)</label>
+                <input type="password" class="form-control" name="pluggy_client_secret">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Pluggy Account ID (opcional)</label>
+                <input type="text" class="form-control" name="pluggy_account_id">
+            </div>
+            <button type="submit" class="btn btn-success w-100">
+                <i class="fas fa-plus me-1"></i>Criar rateio
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

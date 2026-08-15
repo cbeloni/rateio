@@ -1,6 +1,6 @@
-# Auto Síndico API
+# Rateio Online API
 
-API em FastAPI para gestão de despesas, caixa, fechamento mensal e integrações (e-mail, WhatsApp, Google Drive, Pluggy e PagBank).
+API em FastAPI para rateio de contas (despesas, fundo, fechamento mensal) e integrações (e-mail, WhatsApp, Google Drive, Pluggy e PagBank).
 
 ## Requisitos
 
@@ -70,6 +70,7 @@ A API ficará em `http://localhost:8001` (porta `8001` no host mapeada para `800
   - Usadas em: `/send-whatsapp`, `/cobrar-whatsapp`
 - `PLUGGY_CLIENT_ID`, `PLUGGY_CLIENT_SECRET`
   - Usadas em: `/extrato` com provider `pluggy` (default)
+  - Podem ser **sobrescritas por rateio** no cadastro do rateio (junto com `PLUGGY_ACCOUNT_ID`)
 - `PAGBANK_USER`, `PAGBANK_TOKEN`
   - Usadas em: `/movimentos-pagbank`
 - `MERCADOPAGO_COOKIE`

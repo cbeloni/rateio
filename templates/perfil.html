@@ -1,0 +1,60 @@
+{% extends "template.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="text-center mb-4">
+            <div class="feature-icon">
+                <i class="fas fa-id-card"></i>
+            </div>
+            <h2 class="h3 mb-2">Meu Perfil</h2>
+            <p class="text-muted mb-0">Informações da sua conta</p>
+        </div>
+
+        <div class="feature-card">
+            <div class="text-center mb-4">
+                <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width: 90px; height: 90px; font-size: 2.2rem; color: var(--brand);">
+                    <i class="fas fa-user"></i>
+                </div>
+                <h4 class="mt-3 mb-1">{{ usuario.nome }}</h4>
+                <span class="badge bg-success">{{ 'Organizador' if usuario.perfil == 'organizador' else 'Membro' }}</span>
+            </div>
+
+            <hr>
+
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                        <span class="text-muted">
+                            <i class="fas fa-envelope me-2"></i>E-mail
+                        </span>
+                        <span class="fw-bold">{{ usuario.email }}</span>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                        <span class="text-muted">
+                            <i class="fas fa-tag me-2"></i>Perfil de acesso
+                        </span>
+                        <span class="fw-bold">{{ 'Organizador' if usuario.perfil == 'organizador' else 'Membro' }}</span>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                        <span class="text-muted">
+                            <i class="fas fa-calendar-alt me-2"></i>Cadastrado em
+                        </span>
+                        <span class="fw-bold">{{ usuario.created_at[:10] if usuario.created_at else '-' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-grid">
+                <a href="/logout" class="btn btn-outline-danger">
+                    <i class="fas fa-sign-out-alt me-2"></i>Sair da conta
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

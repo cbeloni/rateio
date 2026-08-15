@@ -62,6 +62,4 @@ if __name__ == '__main__':
             print(resposta.text)
     else:
         print("Não foi possível obter uma resposta.")
-
-if __name__ == "__main__":
     

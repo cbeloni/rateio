@@ -1,0 +1,62 @@
+{% extends "template.html" %}
+
+{% block content %}
+<div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+    <div>
+        <h2 class="h4 mb-1">Usuários</h2>
+        <p class="text-muted mb-0">Lista de usuários cadastrados no sistema</p>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>Perfil</th>
+                <th>Owner</th>
+                <th>Status</th>
+                <th>Cadastro</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in usuarios %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td class="fw-bold">
+                    {{ user.nome }}
+                    {% if usuario.id == user.id %}
+                    <span class="badge bg-success ms-1">Você</span>
+                    {% endif %}
+                </td>
+                <td>{{ user.email }}</td>
+                <td>
+                    {% if user.perfil == 'organizador' %}
+                    <span class="badge bg-success">Organizador</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Membro</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if user.owner %}
+                    <span class="badge bg-dark">Owner</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if user.ativo %}
+                    <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>Ativo</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pendente</span>
+                    {% endif %}
+                </td>
+                <td>{{ user.created_at[:10] if user.created_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

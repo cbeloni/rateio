@@ -46,7 +46,7 @@ jobs:
           context: .
           platforms: linux/arm/v7
           push: true
-          tags: cbeloni/auto-sindico:arm64
+          tags: cbeloni/rateio-online:arm64
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -62,5 +62,5 @@ jobs:
 
       - name: Apply Kubernetes manifests
         run: |          
-          kubectl apply -f argocd-arm/auto-sindico-arm.yaml --insecure-skip-tls-verify
-          kubectl rollout restart deployment/auto-sindico --insecure-skip-tls-verify
+          kubectl apply -f argocd-arm/rateio-online-arm.yaml --insecure-skip-tls-verify
+          kubectl rollout restart deployment/rateio-online --insecure-skip-tls-verify

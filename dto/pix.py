@@ -16,6 +16,6 @@ pix = PixRequest(
     key='cbeloni@gmail.com',
     identification='12345',
     zipcode_receiver='09291250',
-    description='condominio mensal',
+    description='rateio mensal',
     amount=1.0
 )

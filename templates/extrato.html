@@ -1,0 +1,119 @@
+{% extends "template.html" %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h2 class="h4 mb-1">Extrato</h2>
+        <p class="text-muted mb-0">Movimentações recebidas do Pluggy por rateio</p>
+    </div>
+</div>
+
+{% if mensagem %}
+<div class="alert alert-info py-2" role="alert">
+    <i class="fas fa-info-circle me-2"></i>{{ mensagem }}
+</div>
+{% endif %}
+
+{% if rateios %}
+<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+    <form method="get" action="/extrato" class="d-flex gap-2 align-items-center">
+        <label class="form-label mb-0">Rateio:</label>
+        <select class="form-select w-auto" name="rateio_id" onchange="this.form.submit()">
+            {% for r in rateios %}
+            <option value="{{ r.id }}" {% if rateio and r.id == rateio.id %}selected{% endif %}>{{ r.nome }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    {% if rateio and usuario.perfil == 'organizador' %}
+    <form method="post" action="/extrato/atualizar" class="d-inline">
+        <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+        <button type="submit" class="btn btn-success">
+            <i class="fas fa-sync-alt me-1"></i>Atualizar extrato
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if rateio %}
+<div class="feature-card">
+    <h3 class="h6 mb-3">Extrato de {{ rateio.nome }}</h3>
+    {% if transacoes %}
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Identificação</th>
+                    <th>Transação</th>
+                    <th>Tipo</th>
+                    <th class="text-end">Valor</th>
+                    <th>Categoria</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transacoes %}
+                <tr>
+                    <td>{{ t.data }}</td>
+                    <td>{{ t.identificacao }}</td>
+                    <td>{{ t.transacao }}</td>
+                    <td>
+                        {% if t.tipo_transacao == 'CREDIT' %}
+                        <span class="badge bg-success">Crédito</span>
+                        {% elif t.tipo_transacao == 'DEBIT' %}
+                        <span class="badge bg-danger">Débito</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ t.tipo_transacao }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold {{ 'text-success' if t.valor > 0 else 'text-danger' }}">{{ '%.2f'|format(t.valor) }}</td>
+                    <td style="min-width: 300px;">
+                        {% if t.eh_debito %}
+                        <form method="post" action="/extrato/classificar" class="d-flex align-items-center gap-2 flex-wrap">
+                            <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+                            <input type="hidden" name="codigo_transacao" value="{{ t.codigo_transacao }}">
+                            <input type="hidden" name="identificacao" value="{{ t.identificacao }}">
+                            <select class="form-select form-select-sm w-auto" name="categoria_id">
+                                <option value="">—</option>
+                                {% for categoria in categorias %}
+                                <option value="{{ categoria.id }}" {% if t.categoria_id == categoria.id %}selected{% endif %}>{{ categoria.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" name="salvar_identificador" id="salvar-id-{{ loop.index }}">
+                                <label class="form-check-label small" for="salvar-id-{{ loop.index }}">salvar identificador</label>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-success">Salvar</button>
+                        </form>
+                        {% else %}
+                        <form method="post" action="/extrato/vincular-membro" class="d-flex align-items-center gap-2 flex-wrap">
+                            <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
+                            <input type="hidden" name="identificacao" value="{{ t.identificacao }}">
+                            <select class="form-select form-select-sm w-auto" name="membro_id">
+                                <option value="">Vincular a um membro…</option>
+                                {% for membro in membros %}
+                                <option value="{{ membro.id }}">{{ membro.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-success">Salvar identificador</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="small text-muted mt-2 mb-0">
+            Para débitos, escolha a categoria (e opcionalmente "salvar identificador" na categoria).
+            Para créditos, vincule a identificação a um membro para casar automaticamente os pagamentos.
+        </p>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">Nenhuma movimentação no extrato ainda. Use "Atualizar extrato" para importar do Pluggy.</p>
+    {% endif %}
+</div>
+{% else %}
+<p class="text-muted">Nenhum rateio disponível.</p>
+{% endif %}
+{% endblock %}

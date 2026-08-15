@@ -1,0 +1,50 @@
+{% extends "template.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="text-center mb-4">
+            <div class="feature-icon">
+                <i class="fas fa-user-lock"></i>
+            </div>
+            <h2 class="h3 mb-2">Entrar</h2>
+            <p class="text-muted mb-0">Acesse sua conta para gerenciar seus rateios</p>
+        </div>
+
+        {% if erro %}
+        <div class="alert alert-danger py-2" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>{{ erro }}
+        </div>
+        {% endif %}
+
+        {% if mensagem %}
+        <div class="alert alert-success py-2" role="alert">
+            <i class="fas fa-check-circle me-2"></i>{{ mensagem }}
+        </div>
+        {% endif %}
+
+        <form method="post" action="/login" class="feature-card">
+            <div class="mb-3">
+                <label for="email" class="form-label">E-mail</label>
+                <input type="email" class="form-control" id="email" name="email" required autofocus
+                       placeholder="seu@email.com">
+            </div>
+            <div class="mb-4">
+                <label for="senha" class="form-label">Senha</label>
+                <input type="password" class="form-control" id="senha" name="senha" required
+                       placeholder="Sua senha">
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="fas fa-sign-in-alt me-2"></i>Entrar
+                </button>
+            </div>
+        </form>
+
+        <p class="text-center text-muted mt-4 mb-0">
+            Não tem uma conta?
+            <a href="/cadastro" class="link-success fw-bold">Cadastre-se</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
