@@ -5,7 +5,11 @@ Base = declarative_base()
 
 
 def criar_tabelas_rateio(engine=None):
-    """Cria as tabelas do modelo de rateio caso ainda não existam."""
+    """Cria as tabelas do modelo de rateio caso ainda não existam.
+
+    As alterações de esquema (colunas etc.) são gerenciadas pelo Alembic
+    (``alembic upgrade head``, executado antes do app subir).
+    """
     # Importa os modelos para registrá-los no metadata compartilhado.
     from repository import categoria as _categoria  # noqa: F401
     from repository import classificacao_manual as _classificacao_manual  # noqa: F401

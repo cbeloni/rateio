@@ -13,4 +13,4 @@ RUN echo "iniciando o instalacao dependências"
 RUN pipenv install --deploy --system --verbose
 
 RUN echo "iniciando o pipenv run..."
-ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
