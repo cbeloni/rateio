@@ -36,7 +36,7 @@
                             <td>R$ {{ rateio.valor_fundo_padrao }}</td>
                             <td class="text-end">
                                 <a class="btn btn-sm btn-outline-success" href="/rateios/{{ rateio.id }}">
-                                    <i class="fas fa-users me-1"></i>Cotas
+                                    <i class="fas fa-pen me-1"></i>Editar
                                 </a>
                                 {% if usuario.perfil == 'organizador' %}
                                 <form method="post" action="/rateios/{{ rateio.id }}/remover" class="d-inline"
