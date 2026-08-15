@@ -4,7 +4,7 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 RUN apt-get update
-RUN apt-get install -y build-essential python3-greenlet pip git wget libgdal-dev
+RUN apt-get install -y build-essential python3-greenlet pip git wget libgdal-dev libcairo2 libpango-1.0-0 libpangocairo-1.0-0
 RUN pip install pipenv 
 # COPY Pipfile Pipfile.lock ./
 COPY . .
