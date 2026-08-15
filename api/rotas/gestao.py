@@ -489,7 +489,6 @@ def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=N
         session.add(membro)
 
     session.commit()
-    session.refresh(membro)
     if principal:
         # Garante um único membro principal por cota.
         session.query(Membro).filter(
@@ -497,8 +496,13 @@ def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=N
             Membro.id != membro.id,
         ).update({Membro.principal: False})
         session.commit()
+
+    # Recarrega o membro após os commits e extrai o dicionário ANTES de fechar a
+    # sessão, evitando DetachedInstanceError ao acessar atributos expirados.
+    session.refresh(membro)
+    resultado = membro.to_dict()
     session.close()
-    return membro.to_dict()
+    return resultado
 
 
 @router.get("/categorias", response_class=HTMLResponse)

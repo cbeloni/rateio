@@ -1,0 +1,104 @@
+{% extends "template.html" %}
+
+{% block content %}
+<div class="container">
+    <!-- Carrossel de destaques -->
+    <div id="carouselDestaque" class="carousel slide mb-5" data-bs-ride="carousel" data-bs-interval="5000">
+        <div class="carousel-indicators">
+            <button type="button" data-bs-target="#carouselDestaque" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+            <button type="button" data-bs-target="#carouselDestaque" data-bs-slide-to="1" aria-label="Slide 2"></button>
+            <button type="button" data-bs-target="#carouselDestaque" data-bs-slide-to="2" aria-label="Slide 3"></button>
+        </div>
+        <div class="carousel-inner rounded-4 overflow-hidden shadow-sm">
+            <div class="carousel-item active" style="background: linear-gradient(120deg, #124e32, #1f6f4a);">
+                <div class="d-flex flex-column justify-content-center align-items-center text-center text-white px-4 py-5" style="min-height: 260px;">
+                    <i class="fas fa-divide mb-3" style="font-size: 3rem;"></i>
+                    <h2 class="h3 fw-bold mb-2">Divida as contas de forma justa</h2>
+                    <p class="mb-0" style="max-width: 560px;">Organize despesas e rateie automaticamente entre as cotas, com parcela calculada mês a mês.</p>
+                </div>
+            </div>
+            <div class="carousel-item" style="background: linear-gradient(120deg, #7a4d0d, #d89b2b);">
+                <div class="d-flex flex-column justify-content-center align-items-center text-center text-white px-4 py-5" style="min-height: 260px;">
+                    <i class="fas fa-university mb-3" style="font-size: 3rem;"></i>
+                    <h2 class="h3 fw-bold mb-2">Caixa e fundo de reserva</h2>
+                    <p class="mb-0" style="max-width: 560px;">Defina categorias de valor fixo (ex.: caixa) e acompanhe o saldo acumulado em tempo real.</p>
+                </div>
+            </div>
+            <div class="carousel-item" style="background: linear-gradient(120deg, #0d4a7a, #1b7fb8);">
+                <div class="d-flex flex-column justify-content-center align-items-center text-center text-white px-4 py-5" style="min-height: 260px;">
+                    <i class="fas fa-qrcode mb-3" style="font-size: 3rem;"></i>
+                    <h2 class="h3 fw-bold mb-2">QR Code PIX por membro</h2>
+                    <p class="mb-0" style="max-width: 560px;">Gere cobranças individuais por membro e envie por e-mail ou WhatsApp.</p>
+                </div>
+            </div>
+        </div>
+        <button class="carousel-control-prev" type="button" data-bs-target="#carouselDestaque" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Anterior</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#carouselDestaque" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Próximo</span>
+        </button>
+    </div>
+
+    <!-- Funcionalidades -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-4">
+            <div class="feature-card text-center">
+                <div class="feature-icon"><i class="fas fa-users"></i></div>
+                <h3 class="h6 mb-2">Cotas e membros</h3>
+                <p class="small text-muted mb-0">Cada cota com seus membros, identificadores de pagamento e um membro principal.</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="feature-card text-center">
+                <div class="feature-icon"><i class="fas fa-tags"></i></div>
+                <h3 class="h6 mb-2">Categorias de despesas</h3>
+                <p class="small text-muted mb-0">Classifique as despesas do extrato ou crie categorias de valor fixo mensal.</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="feature-card text-center">
+                <div class="feature-icon"><i class="fas fa-calendar-check"></i></div>
+                <h3 class="h6 mb-2">Fechamentos mensais</h3>
+                <p class="small text-muted mb-0">Feche o mês, sincronize pagamentos e mova saldos excedentes entre os meses.</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="feature-card text-center">
+                <div class="feature-icon"><i class="fas fa-qrcode"></i></div>
+                <h3 class="h6 mb-2">QR Code PIX</h3>
+                <p class="small text-muted mb-0">Gere QR Codes individuais por membro, com código copia e cola.</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="feature-card text-center">
+                <div class="feature-icon"><i class="fas fa-paper-plane"></i></div>
+                <h3 class="h6 mb-2">Cobranças automáticas</h3>
+                <p class="small text-muted mb-0">Envie a mensagem de cobrança por e-mail e WhatsApp para cada cota ou membro.</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="feature-card text-center">
+                <div class="feature-icon"><i class="fas fa-chart-pie"></i></div>
+                <h3 class="h6 mb-2">Painel financeiro</h3>
+                <p class="small text-muted mb-0">Acompanhe despesas, pagamentos, caixa e saldo em um único painel.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chamada para ação -->
+    <div class="text-center py-4">
+        <h2 class="h4 mb-3">Comece a dividir suas contas agora</h2>
+        <div class="d-flex gap-2 justify-content-center">
+            <a href="/cadastro" class="btn btn-success btn-lg">
+                <i class="fas fa-user-plus me-2"></i>Criar conta grátis
+            </a>
+            <a href="/login" class="btn btn-outline-success btn-lg">
+                <i class="fas fa-sign-in-alt me-2"></i>Entrar
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
