@@ -1,3 +1,5 @@
+import logging
+
 from fastapi.templating import Jinja2Templates
 
 from dto.cobrar_request import CobrarRequest
@@ -11,6 +13,8 @@ from repository.cobranca import (
 from repository.membro import buscar_por_id, membro_contato
 from service.email_service import enviar_email
 from service.whatsapp_service import enviar_cobranca_whatsapp
+
+logger = logging.getLogger(__name__)
 
 
 def _membro_responsavel(cobranca):
@@ -49,8 +53,13 @@ def _enviar_email(cobranca) -> bool:
     try:
         enviar_email(subject=assunto, body=body, to_email=email)
         marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='enviado', membro_id=cobranca.membro_id)
+        logger.info("E-mail de cobrança enviado para %s (%s %s/%s).", email, cobranca.cota, cobranca.mes, cobranca.ano)
         return True
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "Falha ao enviar e-mail de cobrança para %s (%s %s/%s): %s",
+            email, cobranca.cota, cobranca.mes, cobranca.ano, exc,
+        )
         marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha', membro_id=cobranca.membro_id)
         return False
 
@@ -89,6 +98,10 @@ def _enviar_whatsapp(cobranca) -> bool:
 
     telefone = membro.telefone if membro else None
     if not telefone:
+        logger.warning(
+            "Cobrança %s %s/%s sem telefone para WhatsApp (membro_id=%s).",
+            cobranca.cota, cobranca.mes, cobranca.ano, cobranca.membro_id,
+        )
         marcar_status_whatsapp(
             mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha', membro_id=cobranca.membro_id
         )
@@ -104,8 +117,13 @@ def _enviar_whatsapp(cobranca) -> bool:
         marcar_status_whatsapp(
             mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='enviado', membro_id=cobranca.membro_id
         )
+        logger.info("WhatsApp de cobrança enviado para %s (%s %s/%s).", telefone, cobranca.cota, cobranca.mes, cobranca.ano)
         return True
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "Falha ao enviar WhatsApp para %s (%s %s/%s): %s",
+            telefone, cobranca.cota, cobranca.mes, cobranca.ano, exc,
+        )
         marcar_status_whatsapp(
             mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha', membro_id=cobranca.membro_id
         )
@@ -136,6 +154,7 @@ def cobrar_cota(mes, ano, cota_id) -> dict:
     """
     cobrancas = listar_por_cota_mes(mes, ano, cota_id)
     if not cobrancas:
+        logger.warning("Cobrança não encontrada: cota_id=%s mes=%s ano=%s", cota_id, mes, ano)
         return {"encontrada": False, "email": False, "whatsapp": False}
 
     email_ok = False
@@ -144,4 +163,8 @@ def cobrar_cota(mes, ano, cota_id) -> dict:
         email_ok = _enviar_email(cobranca) or email_ok
         whatsapp_ok = _enviar_whatsapp(cobranca) or whatsapp_ok
 
+    logger.info(
+        "Cobrança da cota %s (%s/%s): encontrada=True, email=%s, whatsapp=%s",
+        cota_id, mes, ano, email_ok, whatsapp_ok,
+    )
     return {"encontrada": True, "email": email_ok, "whatsapp": whatsapp_ok}
