@@ -55,10 +55,10 @@ def _enviar_email(cobranca) -> bool:
         marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='enviado', membro_id=cobranca.membro_id)
         logger.info("E-mail de cobrança enviado para %s (%s %s/%s).", email, cobranca.cota, cobranca.mes, cobranca.ano)
         return True
-    except Exception as exc:
+    except Exception:
         logger.exception(
-            "Falha ao enviar e-mail de cobrança para %s (%s %s/%s): %s",
-            email, cobranca.cota, cobranca.mes, cobranca.ano, exc,
+            "Falha ao enviar e-mail de cobrança para %s (%s %s/%s).",
+            email, cobranca.cota, cobranca.mes, cobranca.ano,
         )
         marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha', membro_id=cobranca.membro_id)
         return False
@@ -119,10 +119,10 @@ def _enviar_whatsapp(cobranca) -> bool:
         )
         logger.info("WhatsApp de cobrança enviado para %s (%s %s/%s).", telefone, cobranca.cota, cobranca.mes, cobranca.ano)
         return True
-    except Exception as exc:
+    except Exception:
         logger.exception(
-            "Falha ao enviar WhatsApp para %s (%s %s/%s): %s",
-            telefone, cobranca.cota, cobranca.mes, cobranca.ano, exc,
+            "Falha ao enviar WhatsApp para %s (%s %s/%s).",
+            telefone, cobranca.cota, cobranca.mes, cobranca.ano,
         )
         marcar_status_whatsapp(
             mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha', membro_id=cobranca.membro_id
@@ -160,8 +160,16 @@ def cobrar_cota(mes, ano, cota_id) -> dict:
     email_ok = False
     whatsapp_ok = False
     for cobranca in cobrancas:
-        email_ok = _enviar_email(cobranca) or email_ok
-        whatsapp_ok = _enviar_whatsapp(cobranca) or whatsapp_ok
+        # E-mail e WhatsApp são independentes: uma falha no WhatsApp (bot fora
+        # do ar) não pode impedir o envio do e-mail, e vice-versa.
+        try:
+            email_ok = _enviar_email(cobranca) or email_ok
+        except Exception:
+            logger.exception("Erro inesperado ao enviar e-mail da cobrança id=%s.", cobranca.id)
+        try:
+            whatsapp_ok = _enviar_whatsapp(cobranca) or whatsapp_ok
+        except Exception:
+            logger.exception("Erro inesperado ao enviar WhatsApp da cobrança id=%s.", cobranca.id)
 
     logger.info(
         "Cobrança da cota %s (%s/%s): encontrada=True, email=%s, whatsapp=%s",
