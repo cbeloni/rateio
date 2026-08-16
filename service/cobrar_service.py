@@ -30,8 +30,42 @@ def _membro_responsavel(cobranca):
     return None
 
 
+def _membro_optou_nao_receber(membro) -> bool:
+    """Verifica a flag de consentimento `receber_mensagens`.
+
+    Esta é a única porta de entrada para o envio: deve ser checada SEMPRE,
+    em todos os canais (e-mail e WhatsApp).
+
+    - Membro inexistente (None) => False (não é "opt-out", segue o fluxo normal).
+    - Flag `False` ou `None`    => True (tratado como "não quer receber").
+    """
+    if membro is None:
+        return False
+    return not bool(membro.receber_mensagens)
+
+
 def _enviar_email(cobranca) -> bool:
     """Envia a cobrança por e-mail e registra o status no canal e-mail."""
+    logger.info(
+        "E-MAIL [início] preparando cobrança: cota=%s, %s/%s, valor=R$ %s, membro_id=%s",
+        cobranca.cota, cobranca.mes, cobranca.ano, cobranca.valor, cobranca.membro_id,
+    )
+
+    membro = _membro_responsavel(cobranca)
+    if _membro_optou_nao_receber(membro):
+        logger.info(
+            "Membro %s optou por não receber mensagens — e-mail não enviado (%s %s/%s).",
+            membro.nome, cobranca.cota, cobranca.mes, cobranca.ano,
+        )
+        marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='nao_enviar', membro_id=cobranca.membro_id)
+        return False
+
+    email = membro.email if membro and membro.email else 'cbeloni@gmail.com'
+    logger.info(
+        "E-MAIL [início] destinatário=%s, cota=%s, %s/%s, valor=R$ %s",
+        email, cobranca.cota, cobranca.mes, cobranca.ano, cobranca.valor,
+    )
+
     templates = Jinja2Templates(directory="templates")
     context = {
         "request": {},
@@ -42,22 +76,22 @@ def _enviar_email(cobranca) -> bool:
     }
     body = templates.env.get_template("email.html").render(**context)
     assunto = f'Cobrança {cobranca.cota} - {cobranca.mes}.{cobranca.ano}'
-
-    membro = _membro_responsavel(cobranca)
-    if membro and not membro.receber_mensagens:
-        marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='nao_enviar', membro_id=cobranca.membro_id)
-        return False
-
-    email = membro.email if membro and membro.email else 'cbeloni@gmail.com'
+    logger.info(
+        "E-MAIL [meio] mensagem renderizada: assunto=%r, corpo=%d caracteres — enviando para %s",
+        assunto, len(body), email,
+    )
 
     try:
         enviar_email(subject=assunto, body=body, to_email=email)
         marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='enviado', membro_id=cobranca.membro_id)
-        logger.info("E-mail de cobrança enviado para %s (%s %s/%s).", email, cobranca.cota, cobranca.mes, cobranca.ano)
+        logger.info(
+            "E-MAIL [fim] enviado com sucesso para %s (%s %s/%s).",
+            email, cobranca.cota, cobranca.mes, cobranca.ano,
+        )
         return True
     except Exception:
         logger.exception(
-            "Falha ao enviar e-mail de cobrança para %s (%s %s/%s).",
+            "E-MAIL [fim] falha ao enviar para %s (%s %s/%s).",
             email, cobranca.cota, cobranca.mes, cobranca.ano,
         )
         marcar_status(mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='falha', membro_id=cobranca.membro_id)
@@ -78,19 +112,17 @@ def cobrar_e_enviar_email(fechamento_request: CobrarRequest):
 
 def _enviar_whatsapp(cobranca) -> bool:
     """Envia a cobrança por WhatsApp e registra o status no canal WhatsApp."""
-    templates = Jinja2Templates(directory="templates")
-    context = {
-        "request": {},
-        "cota": cobranca.cota,
-        "mes": cobranca.mes,
-        "valor": cobranca.valor,
-        "codigo_pix": cobranca.brcode,
-    }
-
-    body = templates.env.get_template("whatsapp_template.txt").render(**context)
+    logger.info(
+        "WHATSAPP [início] preparando cobrança: cota=%s, %s/%s, valor=R$ %s, membro_id=%s",
+        cobranca.cota, cobranca.mes, cobranca.ano, cobranca.valor, cobranca.membro_id,
+    )
 
     membro = _membro_responsavel(cobranca)
-    if membro and not membro.receber_mensagens:
+    if _membro_optou_nao_receber(membro):
+        logger.info(
+            "Membro %s optou por não receber mensagens — WhatsApp não enviado (%s %s/%s).",
+            membro.nome, cobranca.cota, cobranca.mes, cobranca.ano,
+        )
         marcar_status_whatsapp(
             mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='nao_enviar', membro_id=cobranca.membro_id
         )
@@ -107,6 +139,25 @@ def _enviar_whatsapp(cobranca) -> bool:
         )
         return False
 
+    logger.info(
+        "WHATSAPP [início] destinatário=%s, cota=%s, %s/%s, valor=R$ %s",
+        telefone, cobranca.cota, cobranca.mes, cobranca.ano, cobranca.valor,
+    )
+
+    templates = Jinja2Templates(directory="templates")
+    context = {
+        "request": {},
+        "cota": cobranca.cota,
+        "mes": cobranca.mes,
+        "valor": cobranca.valor,
+        "codigo_pix": cobranca.brcode,
+    }
+    body = templates.env.get_template("whatsapp_template.txt").render(**context)
+    logger.info(
+        "WHATSAPP [meio] mensagem renderizada: %d caracteres — enviando para %s",
+        len(body), telefone,
+    )
+
     try:
         enviar_cobranca_whatsapp(
             telefone=telefone,
@@ -117,11 +168,14 @@ def _enviar_whatsapp(cobranca) -> bool:
         marcar_status_whatsapp(
             mes=cobranca.mes, ano=cobranca.ano, cota=cobranca.cota, status='enviado', membro_id=cobranca.membro_id
         )
-        logger.info("WhatsApp de cobrança enviado para %s (%s %s/%s).", telefone, cobranca.cota, cobranca.mes, cobranca.ano)
+        logger.info(
+            "WHATSAPP [fim] enviado com sucesso para %s (%s %s/%s).",
+            telefone, cobranca.cota, cobranca.mes, cobranca.ano,
+        )
         return True
     except Exception:
         logger.exception(
-            "Falha ao enviar WhatsApp para %s (%s %s/%s).",
+            "WHATSAPP [fim] falha ao enviar para %s (%s %s/%s).",
             telefone, cobranca.cota, cobranca.mes, cobranca.ano,
         )
         marcar_status_whatsapp(
