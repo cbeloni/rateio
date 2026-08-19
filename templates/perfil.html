@@ -2,59 +2,254 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
+    <div class="col-md-8 col-lg-7">
         <div class="text-center mb-4">
             <div class="feature-icon">
-                <i class="fas fa-id-card"></i>
+                <i class="fas fa-cog"></i>
             </div>
-            <h2 class="h3 mb-2">Meu Perfil</h2>
-            <p class="text-muted mb-0">Informações da sua conta</p>
+            <h2 class="h3 mb-2">Configurações</h2>
+            <p class="text-muted mb-0">Gerencie sua conta e a conexão com o WhatsApp</p>
         </div>
 
         <div class="feature-card">
-            <div class="text-center mb-4">
-                <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width: 90px; height: 90px; font-size: 2.2rem; color: var(--brand);">
-                    <i class="fas fa-user"></i>
-                </div>
-                <h4 class="mt-3 mb-1">{{ usuario.nome }}</h4>
-                <span class="badge bg-success">{{ 'Organizador' if usuario.perfil == 'organizador' else 'Membro' }}</span>
-            </div>
+            <ul class="nav nav-tabs" id="configTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="conta-tab" data-bs-toggle="tab" data-bs-target="#conta" type="button" role="tab" aria-controls="conta" aria-selected="true">
+                        <i class="fas fa-user me-2"></i>Conta
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="whatsapp-tab" data-bs-toggle="tab" data-bs-target="#whatsapp" type="button" role="tab" aria-controls="whatsapp" aria-selected="false">
+                        <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                    </button>
+                </li>
+            </ul>
 
-            <hr>
+            <div class="tab-content pt-3">
+                <!-- Aba Conta -->
+                <div class="tab-pane fade show active" id="conta" role="tabpanel" aria-labelledby="conta-tab">
+                    <div class="text-center mb-4">
+                        <div class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center" style="width: 90px; height: 90px; font-size: 2.2rem; color: var(--brand);">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <h4 class="mt-3 mb-1">{{ usuario.nome }}</h4>
+                        <span class="badge bg-success">{{ 'Organizador' if usuario.perfil == 'organizador' else 'Membro' }}</span>
+                    </div>
 
-            <div class="row g-3">
-                <div class="col-12">
-                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
-                        <span class="text-muted">
-                            <i class="fas fa-envelope me-2"></i>E-mail
-                        </span>
-                        <span class="fw-bold">{{ usuario.email }}</span>
+                    <hr>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                                <span class="text-muted">
+                                    <i class="fas fa-envelope me-2"></i>E-mail
+                                </span>
+                                <span class="fw-bold">{{ usuario.email }}</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                                <span class="text-muted">
+                                    <i class="fas fa-tag me-2"></i>Acesso
+                                </span>
+                                <span class="fw-bold">{{ 'Organizador' if usuario.perfil == 'organizador' else 'Membro' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                                <span class="text-muted">
+                                    <i class="fas fa-calendar-alt me-2"></i>Cadastrado em
+                                </span>
+                                <span class="fw-bold">{{ usuario.created_at[:10] if usuario.created_at else '-' }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 d-grid">
+                        <a href="/logout" class="btn btn-outline-danger">
+                            <i class="fas fa-sign-out-alt me-2"></i>Sair da conta
+                        </a>
                     </div>
                 </div>
-                <div class="col-12">
-                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
-                        <span class="text-muted">
-                            <i class="fas fa-tag me-2"></i>Perfil de acesso
-                        </span>
-                        <span class="fw-bold">{{ 'Organizador' if usuario.perfil == 'organizador' else 'Membro' }}</span>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
-                        <span class="text-muted">
-                            <i class="fas fa-calendar-alt me-2"></i>Cadastrado em
-                        </span>
-                        <span class="fw-bold">{{ usuario.created_at[:10] if usuario.created_at else '-' }}</span>
-                    </div>
-                </div>
-            </div>
 
-            <div class="mt-4 d-grid">
-                <a href="/logout" class="btn btn-outline-danger">
-                    <i class="fas fa-sign-out-alt me-2"></i>Sair da conta
-                </a>
+                <!-- Aba WhatsApp -->
+                <div class="tab-pane fade" id="whatsapp" role="tabpanel" aria-labelledby="whatsapp-tab">
+                    <div class="text-center mb-4">
+                        <i class="fab fa-whatsapp text-success" style="font-size: 2.4rem;"></i>
+                        <p class="text-muted mb-2">Conecte o seu WhatsApp para receber as cobranças por este canal.</p>
+                        <span id="wa-status" class="badge {% if usuario.whatsapp_conectado %}bg-success{% else %}bg-secondary{% endif %}">
+                            {% if usuario.whatsapp_conectado %}Conectado{% else %}Desconectado{% endif %}
+                        </span>
+                    </div>
+
+                    <div class="text-center mb-3">
+                        <button type="button" id="btn-conectar" class="btn btn-success" onclick="conectarWhatsApp()">
+                            <i class="fab fa-whatsapp me-2"></i>Conectar WhatsApp
+                        </button>
+                        <button type="button" id="btn-desconectar" class="btn btn-outline-danger" onclick="desconectarWhatsApp()">
+                            <i class="fas fa-plug me-2"></i>Desconectar
+                        </button>
+                    </div>
+
+                    <div id="wa-qr-wrap" class="text-center d-none">
+                        <p class="fw-bold mb-2">Escaneie o QR Code com o aplicativo do WhatsApp:</p>
+                        <div id="qrcode" class="d-inline-block p-2 bg-white border rounded"></div>
+                        <div class="mt-3">
+                            <button type="button" id="btn-salvar-qr" class="btn btn-outline-primary d-none" onclick="salvarQr()">
+                                <i class="fas fa-download me-2"></i>Salvar QR Code
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="text-muted small text-center mt-3 mb-0">
+                        O QR Code expira em instantes. Enquanto estiver "Aguardando leitura", um novo é gerado automaticamente.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function () {
+    'use strict';
+
+    var HAS_SESSION = {{ 'true' if usuario.whatsapp_session_id else 'false' }};
+    var pollTimer = null;
+
+    function setStatus(texto, cls) {
+        var el = document.getElementById('wa-status');
+        if (el) {
+            el.textContent = texto;
+            el.className = 'badge ' + cls;
+        }
+    }
+
+    async function api(method, url) {
+        var resp = await fetch(url, {
+            method: method,
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+        var data = {};
+        try { data = await resp.json(); } catch (e) { data = {}; }
+        if (!resp.ok) {
+            throw new Error(data.detail || data.error || ('Erro ' + resp.status));
+        }
+        return data;
+    }
+
+    function mostrarErro(msg) {
+        if (window.showFeedbackError) {
+            window.showFeedbackError(msg, null);
+        } else {
+            setStatus('Erro', 'bg-danger');
+        }
+    }
+
+    function esconderQr() {
+        document.getElementById('wa-qr-wrap').classList.add('d-none');
+        document.getElementById('btn-salvar-qr').classList.add('d-none');
+    }
+
+    function mostrarQr(texto) {
+        var container = document.getElementById('qrcode');
+        container.innerHTML = '';
+        document.getElementById('wa-qr-wrap').classList.remove('d-none');
+        document.getElementById('btn-salvar-qr').classList.remove('d-none');
+        new QRCode(container, {
+            text: texto,
+            width: 230,
+            height: 230,
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    }
+
+    function pararPolling() {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    function iniciarPolling() {
+        if (pollTimer) return;
+        pollTimer = setInterval(atualizarQr, 3000);
+    }
+
+    async function atualizarQr() {
+        try {
+            var data = await api('GET', '/whatsapp/sessao/qrcode');
+            if (data.status === 'connected' || data.connected) {
+                setStatus('Conectado', 'bg-success');
+                pararPolling();
+                esconderQr();
+                return;
+            }
+            if (data.status === 'awaiting_scan' && data.qr) {
+                setStatus('Aguardando leitura…', 'bg-info text-dark');
+                mostrarQr(data.qr);
+                iniciarPolling();
+                return;
+            }
+            // status "connecting": QR ainda não disponível.
+            setStatus('Gerando QR Code…', 'bg-warning text-dark');
+            esconderQr();
+            iniciarPolling();
+        } catch (e) {
+            pararPolling();
+            mostrarErro(e.message);
+        }
+    }
+
+    window.conectarWhatsApp = async function () {
+        try {
+            setStatus('Conectando…', 'bg-warning text-dark');
+            await api('POST', '/whatsapp/sessao');
+            await atualizarQr();
+        } catch (e) {
+            pararPolling();
+            setStatus('Erro', 'bg-danger');
+            mostrarErro(e.message);
+        }
+    };
+
+    window.desconectarWhatsApp = async function () {
+        try {
+            setStatus('Desconectando…', 'bg-warning text-dark');
+            await api('DELETE', '/whatsapp/sessao');
+            pararPolling();
+            esconderQr();
+            setStatus('Desconectado', 'bg-secondary');
+        } catch (e) {
+            mostrarErro(e.message);
+        }
+    };
+
+    window.salvarQr = function () {
+        var container = document.getElementById('qrcode');
+        var img = container.querySelector('img');
+        var canvas = container.querySelector('canvas');
+        var dataUrl = (img && img.src) || (canvas && canvas.toDataURL('image/png'));
+        if (!dataUrl) return;
+        var a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = 'qrcode-whatsapp.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
+    // Ao abrir a aba WhatsApp, só atualiza automaticamente se já houver sessão.
+    var waTab = document.getElementById('whatsapp-tab');
+    if (waTab) {
+        waTab.addEventListener('shown.bs.tab', function () {
+            if (HAS_SESSION) {
+                atualizarQr();
+            }
+        });
+    }
+})();
+</script>
 {% endblock %}

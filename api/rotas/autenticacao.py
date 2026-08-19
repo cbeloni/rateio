@@ -1,11 +1,17 @@
 """Rotas de autenticação e gestão de usuários (páginas web)."""
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.requests import Request
 
-from repository.usuario import ativar_usuario, listar_usuarios
+from repository.usuario import (
+    ativar_usuario,
+    limpar_whatsapp_sessao,
+    listar_usuarios,
+    marcar_whatsapp_conectado,
+    salvar_whatsapp_sessao,
+)
 from service.auth_service import (
     autenticar,
     criar_sessao,
@@ -17,10 +23,24 @@ from service.auth_service import (
     usuario_atual,
     verificar_token_confirmacao,
 )
+from service.whatsapp_sessao_service import (
+    WhatsAppBotError,
+    criar_sessao as criar_sessao_whatsapp,
+    excluir_sessao as excluir_sessao_whatsapp,
+    obter_qrcode as obter_qrcode_whatsapp,
+    obter_status as obter_status_whatsapp,
+)
 
 from ..dependencias import templates
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+def _session_id_do_usuario(usuario: dict) -> str:
+    """Identificador estável da sessão do usuário no whatsapp-bot."""
+    return f"usuario_{usuario['id']}"
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -222,14 +242,79 @@ async def logout(request: Request):
     return RedirectResponse(url="/", status_code=303)
 
 
-@router.get("/perfil", response_class=HTMLResponse)
-async def pagina_perfil(request: Request):
-    """Página do perfil do usuário logado."""
+@router.get("/configuracoes", response_class=HTMLResponse)
+async def pagina_configuracoes(request: Request):
+    """Página de configurações do usuário logado."""
     usuario = exigir_login(request)
     return templates.TemplateResponse(
         "perfil.html",
         {"request": request, "usuario": usuario},
     )
+
+
+@router.get("/perfil", response_class=HTMLResponse)
+async def pagina_perfil(request: Request):
+    """Redireciona a rota antiga de perfil para as configurações."""
+    return RedirectResponse(url="/configuracoes", status_code=303)
+
+
+@router.post("/whatsapp/sessao")
+async def whatsapp_criar_sessao(request: Request):
+    """Cria (ou garante) a sessão de WhatsApp do usuário no bot."""
+    usuario = exigir_login(request)
+    session_id = _session_id_do_usuario(usuario)
+    try:
+        resultado = criar_sessao_whatsapp(session_id)
+    except WhatsAppBotError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    salvar_whatsapp_sessao(usuario["id"], session_id)
+    return {"session_id": session_id, **resultado}
+
+
+@router.get("/whatsapp/sessao/qrcode")
+async def whatsapp_obter_qrcode(request: Request):
+    """Retorna o QR Code atual da sessão de WhatsApp do usuário."""
+    usuario = exigir_login(request)
+    session_id = usuario.get("whatsapp_session_id") or _session_id_do_usuario(usuario)
+    try:
+        resultado = obter_qrcode_whatsapp(session_id)
+    except WhatsAppBotError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    conectado = bool(resultado.get("connected"))
+    marcar_whatsapp_conectado(usuario["id"], conectado)
+    return {"session_id": session_id, **resultado}
+
+
+@router.get("/whatsapp/sessao/status")
+async def whatsapp_obter_status(request: Request):
+    """Retorna o status da sessão de WhatsApp do usuário."""
+    usuario = exigir_login(request)
+    session_id = usuario.get("whatsapp_session_id") or _session_id_do_usuario(usuario)
+    try:
+        resultado = obter_status_whatsapp(session_id)
+    except WhatsAppBotError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    conectado = bool(resultado.get("connected"))
+    marcar_whatsapp_conectado(usuario["id"], conectado)
+    return {"session_id": session_id, **resultado}
+
+
+@router.delete("/whatsapp/sessao")
+async def whatsapp_excluir_sessao(request: Request):
+    """Desconecta e remove a sessão de WhatsApp do usuário."""
+    usuario = exigir_login(request)
+    session_id = usuario.get("whatsapp_session_id")
+    if session_id:
+        try:
+            excluir_sessao_whatsapp(session_id)
+        except WhatsAppBotError as exc:
+            logger.warning("Não foi possível encerrar a sessão no bot: %s", exc)
+
+    limpar_whatsapp_sessao(usuario["id"])
+    return {"success": True}
 
 
 @router.get("/usuarios", response_class=HTMLResponse)

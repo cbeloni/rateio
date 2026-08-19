@@ -18,6 +18,8 @@ class Usuario(Base):
     perfil = Column(String(20), nullable=False, default="membro")
     ativo = Column(Boolean, nullable=False, default=False)
     owner = Column(Boolean, nullable=False, default=False)
+    whatsapp_session_id = Column(String(64), nullable=True)
+    whatsapp_conectado = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     def save(self):
@@ -35,6 +37,8 @@ class Usuario(Base):
             "perfil": self.perfil,
             "ativo": self.ativo,
             "owner": bool(self.owner),
+            "whatsapp_session_id": self.whatsapp_session_id,
+            "whatsapp_conectado": bool(self.whatsapp_conectado),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -60,6 +64,16 @@ def criar_tabela_usuarios():
 
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE usuarios ADD COLUMN owner BOOLEAN NOT NULL DEFAULT FALSE"))
+        if "whatsapp_session_id" not in columns:
+            from sqlalchemy import text
+
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE usuarios ADD COLUMN whatsapp_session_id VARCHAR(64) NULL"))
+        if "whatsapp_conectado" not in columns:
+            from sqlalchemy import text
+
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE usuarios ADD COLUMN whatsapp_conectado BOOLEAN NOT NULL DEFAULT FALSE"))
     session.close()
 
 
@@ -98,3 +112,50 @@ def ativar_usuario(user_id: int):
         return result
     session.close()
     return None
+
+
+def salvar_whatsapp_sessao(user_id: int, session_id: str) -> dict | None:
+    """Vincula uma sessão do WhatsApp (whatsapp-bot) ao usuário."""
+    session = get_session()
+    usuario = session.query(Usuario).filter(Usuario.id == user_id).first()
+    if not usuario:
+        session.close()
+        return None
+    usuario.whatsapp_session_id = session_id
+    usuario.whatsapp_conectado = False
+    session.commit()
+    session.refresh(usuario)
+    result = usuario.to_dict()
+    session.close()
+    return result
+
+
+def marcar_whatsapp_conectado(user_id: int, conectado: bool) -> dict | None:
+    """Atualiza o cache de status de conexão do WhatsApp do usuário."""
+    session = get_session()
+    usuario = session.query(Usuario).filter(Usuario.id == user_id).first()
+    if not usuario:
+        session.close()
+        return None
+    usuario.whatsapp_conectado = bool(conectado)
+    session.commit()
+    session.refresh(usuario)
+    result = usuario.to_dict()
+    session.close()
+    return result
+
+
+def limpar_whatsapp_sessao(user_id: int) -> dict | None:
+    """Remove o vínculo da sessão de WhatsApp do usuário."""
+    session = get_session()
+    usuario = session.query(Usuario).filter(Usuario.id == user_id).first()
+    if not usuario:
+        session.close()
+        return None
+    usuario.whatsapp_session_id = None
+    usuario.whatsapp_conectado = False
+    session.commit()
+    session.refresh(usuario)
+    result = usuario.to_dict()
+    session.close()
+    return result

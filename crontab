@@ -1,8 +1,21 @@
 */30 * * * * curl --location --request PUT 'http://datasaude-api.201.23.17.249.sslip.io/api/v1/poluentes/cetesb?persist=true'
 0 22 * * * /home/ubuntu/executa_backup.sh
-0 * * * *  curl --location --request POST 'https://rateio-online.beloni.dev.br/fechamento-pagamentos'
-10 * * * *  curl --location --request POST 'https://rateio-online.beloni.dev.br/fechamento-despesas'
-20 * * * *  curl --location --request POST 'https://rateio-online.beloni.dev.br/cobrar'
-0 15 * * 5 curl --location --request POST  'https://rateio-online.beloni.dev.br/send-whatsapp?numero=5511983012408-1530297280@g.us'
-0 12 * * * curl --location --request POST 'https://rateio-online.beloni.dev.br/extrato'
-0 15 * * 5 curl --location --request POST  'https://rateio-online.beloni.dev.br/cobrar-whatsapp'
+
+# ===== Rateio Online =====
+# 1) Leitura automática do extrato no Pluggy (grava os movimentos do mês atual)
+0 6 * * * curl --location --request POST 'https://rateio-online.beloni.dev.br/extrato' -H 'Content-Type: application/json' -d '{"provider":"pluggy","gravar":true}'
+
+# 2) Fechamento de despesas do mês atual
+10 6 * * * curl --location --request POST 'https://rateio-online.beloni.dev.br/fechamento-despesas'
+
+# 3) Fechamento de pagamentos (créditos do extrato)
+20 6 * * * curl --location --request POST 'https://rateio-online.beloni.dev.br/fechamento-pagamentos'
+
+# 4) Cobranças (e-mail) — diariamente às 06:30
+30 6 * * * curl --location --request POST 'https://rateio-online.beloni.dev.br/cobrar'
+
+# 5) Cobranças por WhatsApp — sextas às 15h
+0 15 * * 5 curl --location --request POST 'https://rateio-online.beloni.dev.br/cobrar-whatsapp'
+
+# 6) Resumo enviado por WhatsApp para o grupo — sextas às 15h
+0 15 * * 5 curl --location --request POST 'https://rateio-online.beloni.dev.br/send-whatsapp?numero=5511983012408-1530297280@g.us'
