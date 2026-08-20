@@ -3,40 +3,47 @@ import logging
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from repository.cobranca import get_last_cobranca
-from util.datas_uteis import first_day_of_current_month, last_day_of_current_month, last_day_of_previous_month
+from util.datas_uteis import (
+    first_day_of_current_month,
+    last_day_of_current_month,
+    last_day_of_previous_month,
+    meses_portugues,
+)
 
 class FechamentoRequest(BaseModel):
     data_inicial: str = Field(default_factory=last_day_of_previous_month)
     data_final: str = Field(default_factory=last_day_of_current_month)
 
 class FechamentoPagamentosDate():
+    """Janela padrão usada pela cron /fechamento-pagamentos.
+
+    Fecha o mês ANTERIOR ao corrente usando os recebimentos do mês corrente,
+    seguindo o modelo de negócio: o fechamento do mês M é pago em M+1.
+
+    Ex.: em agosto, fecha JULHO considerando os recebimentos de agosto
+    (01/08 até o fim do mês). Isso não depende da última cobrança, evitando
+    que a cron reabra um mês antigo (dupla contagem do dia do fechamento)
+    quando ainda não existe cobrança do mês corrente.
+    """
+
     def __init__(self):
-        ultimo_fechamento = get_last_cobranca()
-        data_atual = getattr(ultimo_fechamento, "data_atual", None) if ultimo_fechamento else None
-        logging.info(f"Data atual do último fechamento de despesas: {data_atual}")
+        hoje = datetime.now()
 
-        if isinstance(data_atual, datetime):
-            self.data_inicial = data_atual.strftime("%d/%m/%Y")
-        elif isinstance(data_atual, str) and data_atual.strip():
-            data_atual = data_atual.strip()
-            self.data_inicial = self._normalizar_data(data_atual)
+        if hoje.month == 1:
+            mes_fechamento, self.ano = 12, hoje.year - 1
         else:
-            self.data_inicial = last_day_of_previous_month()
+            mes_fechamento, self.ano = hoje.month - 1, hoje.year
 
-        logging.info(f"Data inicial do fechamento de pagamentos: {self.data_inicial}")
-        self.data_final: str = last_day_of_current_month()
-        logging.info(f"Data final do fechamento de pagamentos: {self.data_final}")
+        self.mes = meses_portugues[datetime(self.ano, mes_fechamento, 1).strftime("%B")]
 
-    @staticmethod
-    def _normalizar_data(data: str) -> str:
-        formatos = ("%d/%m/%Y", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S")
-        for formato in formatos:
-            try:
-                return datetime.strptime(data, formato).strftime("%d/%m/%Y")
-            except ValueError:
-                continue
-        return last_day_of_previous_month()
+        # Janela de recebimentos: primeiro até o último dia do mês corrente.
+        self.data_inicial = f"01/{hoje.month:02d}/{hoje.year}"
+        self.data_final = last_day_of_current_month()
+
+        logging.info(
+            f"Fechamento de pagamentos: fechando {self.mes}/{self.ano} com "
+            f"recebimentos de {self.data_inicial} até {self.data_final}"
+        )
 
 
 class FechamentoDespesasRequest(BaseModel):

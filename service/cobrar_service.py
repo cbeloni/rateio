@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from fastapi.templating import Jinja2Templates
 
@@ -15,6 +16,17 @@ from service.email_service import enviar_email
 from service.whatsapp_service import enviar_cobranca_whatsapp
 
 logger = logging.getLogger(__name__)
+
+
+def pode_enviar_cobranca(agora: datetime | None = None) -> bool:
+    """Janela de envio da cobrança em lote: dia 1 do mês a partir das 09:00.
+
+    O fechamento (despesas + QRCodes) acontece no último dia do mês às 23h; o
+    envio das cobranças para os membros deve ocorrer apenas na manhã do dia 1.
+    Fora dessa janela o envio automático é bloqueado.
+    """
+    agora = agora or datetime.now()  # pyright: ignore[reportCallIssue]  (naive, consistente com o restante do projeto)
+    return agora.day == 1 and agora.hour >= 9
 
 
 def _membro_responsavel(cobranca):
@@ -201,6 +213,11 @@ def cobrar_cota(mes, ano, cota_id) -> dict:
 
     Envio individual (botão "Cobrar"): NÃO valida se a mensagem já foi enviada
     antes, permitindo reenviar para a cota quantas vezes for necessário.
+
+    IMPORTANTE: o envio individual é isento da validação de janela
+    (`pode_enviar_cobranca`), que se aplica apenas ao envio automático em lote
+    (rotas `/cobrar` e `/cobrar-whatsapp`, dia 1 às 9h). Ou seja, o organizador
+    pode reenviar a cobrança de uma cota a qualquer momento.
 
     Com QRs por membro, envia uma cobrança para cada cobranca da cota.
 

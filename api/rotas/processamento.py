@@ -1,4 +1,6 @@
 """Rotas de processamento e operações (JSON)."""
+from datetime import datetime
+
 from fastapi import APIRouter
 
 from dto.cobrar_request import CobrarRequest
@@ -12,7 +14,11 @@ from dto.fechamento_requests import (
 from dto.pagbank_request import MovimentosPagbankParams
 from dto.pix import PixRequest
 from dto.resumo_requests import ResumoRequest
-from service.cobrar_service import cobrar_e_enviar_email, cobrar_e_enviar_whatsapp
+from service.cobrar_service import (
+    cobrar_e_enviar_email,
+    cobrar_e_enviar_whatsapp,
+    pode_enviar_cobranca,
+)
 from service.dashboard import montar_dashboard
 from service.email_service import enviar_email
 from service.extrato.extrato_abstract import ExtratoAbstract
@@ -23,6 +29,7 @@ from service.message_whatsapp import montar_messagem_whatsapp
 from service.qrcode_service import generate_qrcode
 from service.resumo import consultar_tipo_transacao
 from service.send_whatsapp import send_whatsapp_message
+from util.datas_uteis import meses_portugues
 
 router = APIRouter()
 
@@ -83,7 +90,15 @@ def fechamento_despesas(request: FechamentoDespesasRequest = None) -> dict:
 def fechamento_pagamentos(request: FechamentoRequest = None) -> dict:
     if request is None:
         request = FechamentoPagamentosDate()
-    return fechar_pagamentos(request.data_inicial, request.data_final)
+    # Quando vem da cron (sem body), FechamentoPagamentosDate já entrega o
+    # mes/ano do fechamento (mês anterior ao corrente). Em chamadas manuais
+    # com body, mes/ano ficam None e são derivados de data_inicial.
+    return fechar_pagamentos(
+        request.data_inicial,
+        request.data_final,
+        mes=getattr(request, "mes", None),
+        ano=getattr(request, "ano", None),
+    )
 
 
 @router.post("/qrcode")
@@ -116,20 +131,49 @@ def send_whatsapp(numero: str = "5511941503226") -> dict:
     return {"message": "Mensagens enviadas com sucesso"}
 
 
+def _cobranca_request_padrao() -> CobrarRequest:
+    """Fluxo da cron: cobra o mês fechado no último dia (mês anterior ao atual).
+
+    O fechamento de despesas + QRCodes ocorre no último dia do mês às 23h;
+    o envio da cobrança no dia 1 deve mirar esse mês recém-fechado.
+    """
+    hoje = datetime.now()  # pyright: ignore  (naive, consistente com o restante do projeto)
+    if hoje.month == 1:
+        mes_num, ano = 12, hoje.year - 1
+    else:
+        mes_num, ano = hoje.month - 1, hoje.year
+    return CobrarRequest(
+        mes=meses_portugues[datetime(ano, mes_num, 1).strftime("%B")],  # pyright: ignore
+        ano=str(ano),
+    )
+
+
 @router.post("/cobrar")
 def cobrar(request: CobrarRequest = None) -> dict:
     if request is None:
-        request = CobrarRequest()
+        request = _cobranca_request_padrao()
+    if not pode_enviar_cobranca():
+        return {
+            "message": "Cobrança só pode ser enviada às 9h do dia 1",
+            "enviado": False,
+            "bloqueado": True,
+        }
     cobrar_e_enviar_email(request)
-    return {"message": "Email sent successfully"}
+    return {"message": "Email sent successfully", "mes": request.mes, "ano": request.ano}
 
 
 @router.post("/cobrar-whatsapp")
 def cobrar_whatsapp(request: CobrarRequest = None) -> dict:
     if request is None:
-        request = CobrarRequest()
+        request = _cobranca_request_padrao()
+    if not pode_enviar_cobranca():
+        return {
+            "message": "Cobrança só pode ser enviada às 9h do dia 1",
+            "enviado": False,
+            "bloqueado": True,
+        }
     cobrar_e_enviar_whatsapp(request)
-    return {"message": "WhatsApp messages sent successfully"}
+    return {"message": "WhatsApp messages sent successfully", "mes": request.mes, "ano": request.ano}
 
 
 @router.post("/resumo")

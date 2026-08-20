@@ -1,8 +1,23 @@
 */30 * * * * curl --location --request PUT 'http://datasaude-api.201.23.17.249.sslip.io/api/v1/poluentes/cetesb?persist=true'
 0 22 * * * /home/ubuntu/executa_backup.sh
-0 * * * *  curl --location --request POST 'https://rateio-online.beloni.dev.br/fechamento-pagamentos'
-10 * * * *  curl --location --request POST 'https://rateio-online.beloni.dev.br/fechamento-despesas'
-20 * * * *  curl --location --request POST 'https://rateio-online.beloni.dev.br/cobrar'
-0 15 * * 5 curl --location --request POST  'https://rateio-online.beloni.dev.br/send-whatsapp?numero=5511983012408-1530297280@g.us'
-0 12 * * * curl --location --request POST 'https://rateio-online.beloni.dev.br/extrato'
-0 15 * * 5 curl --location --request POST  'https://rateio-online.beloni.dev.br/cobrar-whatsapp'
+
+# ===== Rateio Online =====
+# 1) Leitura automática do extrato (recebimentos) — diariamente às 06:30
+30 6 * * * curl --location --request POST 'https://rateio-online.beloni.dev.br/extrato' -H 'Content-Type: application/json' -d '{"provider":"pluggy","gravar":true}'
+
+# 2) Fechamento de pagamentos (créditos do extrato) — diariamente às 06:40, após o extrato
+40 6 * * * curl --location --request POST 'https://rateio-online.beloni.dev.br/fechamento-pagamentos'
+
+# 3) Fechamento de despesas (atualiza os valores no painel) — diariamente às 23:00.
+#    Os QRCodes são gerados apenas no dia do fechamento (último dia do mês) a partir
+#    das 23h — validação em fechar_despesas (pode_gerar_qrcode).
+0 23 * * * curl --location --request POST 'https://rateio-online.beloni.dev.br/fechamento-despesas'
+
+# 4) Cobranças (e-mail) — DIA 1 às 09:00 (após fechamento do último dia)
+0 9 1 * * curl --location --request POST 'https://rateio-online.beloni.dev.br/cobrar'
+
+# 5) Cobranças por WhatsApp — DIA 1 às 09:05
+5 9 1 * * curl --location --request POST 'https://rateio-online.beloni.dev.br/cobrar-whatsapp'
+
+# 6) Resumo enviado por WhatsApp para o grupo — sextas às 15h
+0 15 * * 5 curl --location --request POST 'https://rateio-online.beloni.dev.br/send-whatsapp?numero=5511983012408-1530297280@g.us'

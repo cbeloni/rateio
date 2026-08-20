@@ -55,7 +55,12 @@ def fechar_despesas(data_inicial, data_final, valida_mes, gerar_cobranca=True, r
         # Periodicidade: 0 = último dia do mês; 1..31 = dia específico.
         dia = rateio.get("dia_fechamento") or 0
         dia_do_fechamento = ultimo_dia_mes_atual().day if dia == 0 else dia
-        pode_gerar_qrcode = not valida_mes or datetime.now().day == dia_do_fechamento
+        # Os valores das despesas são atualizados todos os dias (cron diária), mas
+        # o QRcode só é gerado no dia do fechamento A PARTIR DAS 23h, para que a
+        # cobrança saia na virada do mês (último dia às 23h).
+        pode_gerar_qrcode = not valida_mes or (
+            datetime.now().day == dia_do_fechamento and datetime.now().hour >= 23
+        )
 
         classificacoes = {
             c["codigo_transacao"]: c["categoria_id"]
