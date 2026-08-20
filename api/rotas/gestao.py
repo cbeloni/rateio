@@ -44,6 +44,7 @@ from repository.responsabilidade import listar_por_rateio as listar_responsabili
 from service.auth_service import exigir_login, hash_senha
 from service.cobrar_service import cobrar_cota as cobrar_cota_service, cobrar_e_enviar_whatsapp
 from service.dashboard import montar_dashboard
+from service.extrato.etiqueta import montar_etiqueta
 from service.fechamento_despesas import fechar_despesas
 from service.fechamento_pagamento import fechar_pagamentos, recalcular_fechamentos
 
@@ -610,8 +611,10 @@ async def pagina_extrato(request: Request):
 
     transacoes = []
     if rateio:
+        nome_cota = {c["id"]: c["identificador"] for c in listar_cotas(rateio_id)}
+        categorias_etiqueta = [c for c in categorias if c.get("ativo")]
         for t in listar_extrato(rateio_id):
-            transacoes.append({
+            item = {
                 "banco": t.banco,
                 "data": t.data,
                 "transacao": t.transacao,
@@ -621,7 +624,11 @@ async def pagina_extrato(request: Request):
                 "codigo_transacao": t.codigo_transacao,
                 "eh_debito": t.tipo_transacao == get_transacao_debito(t.banco),
                 "categoria_id": map_classificacao.get(t.codigo_transacao),
-            })
+            }
+            item.update(
+                montar_etiqueta(item, categorias_etiqueta, map_classificacao, membros, nome_cota=nome_cota)
+            )
+            transacoes.append(item)
 
     mensagem = request.query_params.get("mensagem", None)
     return templates.TemplateResponse(

@@ -46,9 +46,10 @@
                 <tr>
                     <th>Data</th>
                     <th>Identificação</th>
-                    <th>Transação</th>
+                    <th style="width:130px;">Transação</th>
                     <th>Tipo</th>
                     <th class="text-end">Valor</th>
+                    <th>Etiqueta</th>
                     <th>Categoria</th>
                 </tr>
             </thead>
@@ -57,7 +58,7 @@
                 <tr>
                     <td>{{ t.data }}</td>
                     <td>{{ t.identificacao }}</td>
-                    <td>{{ t.transacao }}</td>
+                    <td style="width:130px;"><span class="d-inline-block text-truncate" style="max-width:120px;">{{ t.transacao }}</span></td>
                     <td>
                         {% if t.tipo_transacao == 'CREDIT' %}
                         <span class="badge bg-success">Crédito</span>
@@ -68,6 +69,13 @@
                         {% endif %}
                     </td>
                     <td class="text-end fw-bold {{ 'text-success' if t.valor > 0 else 'text-danger' }}">{{ '%.2f'|format(t.valor) }}</td>
+                    <td>
+                        {% if t.etiqueta_tipo == 'identificado' %}
+                        <span class="badge bg-success" title="Identificado: {{ t.etiqueta_identificador or '' }}"><i class="fas fa-check me-1"></i>{{ t.etiqueta_texto }}</span>
+                        {% elif t.etiqueta_tipo == 'regra_salva' %}
+                        <span class="badge bg-primary" title="Classificação manual salva"><i class="fas fa-bookmark me-1"></i>{{ t.etiqueta_texto }}</span>
+                        {% endif %}
+                    </td>
                     <td style="min-width: 300px;">
                         {% if t.eh_debito %}
                         <form method="post" action="/extrato/classificar" class="d-flex align-items-center gap-2 flex-wrap">
@@ -96,7 +104,7 @@
                                 <option value="{{ membro.id }}">{{ membro.nome }}</option>
                                 {% endfor %}
                             </select>
-                            <button type="submit" class="btn btn-sm btn-outline-success">Salvar identificador</button>
+                            <button type="submit" class="btn btn-sm btn-success">Salvar identificador</button>
                         </form>
                         {% endif %}
                     </td>
