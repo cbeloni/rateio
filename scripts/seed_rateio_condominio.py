@@ -12,7 +12,6 @@ o identificador da esquerda é vinculado ao membro da direita. Ex.:
 """
 import argparse
 import sys
-from decimal import Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -29,25 +28,21 @@ APARTAMENTOS = {
         "nomes": ["everton silva", "alexandre tomassine", "alexandre toma(alexandre tomassine)", "meuoculos.com(everton silva)"],
         "email": "everton.silvasousa@gmail.com",
         "telefone": "5511998107488",
-        "valor_fundo": Decimal("0.00"),
     },
     "AP2": {
         "nomes": ["ana carolina"],
         "email": "anacarolina.bnl@gmail.com",
         "telefone": "5512988591266",
-        "valor_fundo": Decimal("100.00"),
     },
     "AP3": {
         "nomes": ["tathiane de almeida", "filipe", "tathy modas(tathiane de almeida)"],
         "email": "tathigarcia@hotmail.com",
         "telefone": "5511983012408",
-        "valor_fundo": Decimal("100.00"),
     },
     "AP4": {
         "nomes": ["cauê beloni", "caue beloni(cauê beloni)", "raquel santos"],
         "email": "caue.beloni@unifesp.br",
         "telefone": "5511986768497",
-        "valor_fundo": Decimal("100.00"),
     },
 }
 
@@ -120,17 +115,15 @@ def main():
             cota = Cota(
                 rateio_id=rateio.id,
                 identificador=identificador,
-                valor_fundo=dados["valor_fundo"],
                 ordem=ordem,
                 ativo=True,
             )
             cota.save()
             cota = _buscar_cota_por_identificador(rateio.id, identificador)
-        elif cota.identificador != identificador or cota.valor_fundo != dados["valor_fundo"] or cota.ordem != ordem:
-            # Normaliza identificador, fundo e ordem da cota existente.
+        elif cota.identificador != identificador or cota.ordem != ordem:
+            # Normaliza identificador e ordem da cota existente.
             session = get_session()
             cota.identificador = identificador
-            cota.valor_fundo = dados["valor_fundo"]
             cota.ordem = ordem
             session.merge(cota)
             session.commit()

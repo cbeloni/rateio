@@ -36,9 +36,13 @@
                             <td>R$ {{ rateio.valor_fundo_padrao }}</td>
                             <td class="text-end">
                                 <a class="btn btn-sm btn-outline-success" href="/rateios/{{ rateio.id }}">
+                                    {% if rateio.organizador_id == usuario.id %}
                                     <i class="fas fa-pen me-1"></i>Editar
+                                    {% else %}
+                                    <i class="fas fa-eye me-1"></i>Visualizar
+                                    {% endif %}
                                 </a>
-                                {% if usuario.perfil == 'organizador' %}
+                                {% if rateio.organizador_id == usuario.id %}
                                 <form method="post" action="/rateios/{{ rateio.id }}/remover" class="d-inline"
                                       onsubmit="return confirm('Desativar o rateio {{ rateio.nome }}? Ele deixará de aparecer nas telas e nos fechamentos.');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Desativar rateio">

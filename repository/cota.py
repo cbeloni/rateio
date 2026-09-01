@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, DECIMAL, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
 
 from config.database import get_session
 from repository.base import Base
@@ -13,7 +13,6 @@ class Cota(Base):
     rateio_id = Column(Integer, nullable=False)
     identificador = Column(String(50), nullable=False)
     descricao = Column(String(50), nullable=True)
-    valor_fundo = Column(DECIMAL(10, 2), nullable=True)
     ordem = Column(Integer, nullable=False, default=0)
     ativo = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -33,7 +32,6 @@ class Cota(Base):
             "rateio_id": self.rateio_id,
             "identificador": self.identificador,
             "descricao": self.descricao,
-            "valor_fundo": float(self.valor_fundo) if self.valor_fundo is not None else None,
             "ordem": self.ordem,
             "ativo": self.ativo,
             "created_at": self.created_at,

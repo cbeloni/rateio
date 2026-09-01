@@ -1,12 +1,4 @@
 """Regras de negócio compartilhadas do modelo de rateio."""
-from decimal import Decimal
-
-
-def valor_fundo_da_cota(rateio: dict, cota: dict) -> Decimal:
-    """Valor de fundo de uma cota: sobrescrito ou padrão do rateio."""
-    if cota.get("valor_fundo") is not None:
-        return Decimal(str(cota["valor_fundo"]))
-    return Decimal(str(rateio.get("valor_fundo_padrao") or 0))
 
 
 def cota_financiadora(rateio_id: int, organizador_id: int):

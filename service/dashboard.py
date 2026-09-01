@@ -30,10 +30,9 @@ MESES_ORDEM = {
 def montar_dashboard(usuario=None):
     if usuario is None:
         rateios = listar_todos()
-    elif usuario.get("perfil") == "organizador":
-        rateios = listar_por_organizador(usuario["id"])
     else:
-        rateios = listar_por_membro(usuario["id"])
+        rateios = listar_por_organizador(usuario["id"]) + listar_por_membro(usuario["id"])
+        rateios = list({rateio["id"]: rateio for rateio in rateios}.values())
 
     resultado = []
     for rateio in rateios:

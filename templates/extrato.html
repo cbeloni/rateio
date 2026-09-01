@@ -25,7 +25,7 @@
         </select>
     </form>
 
-    {% if rateio and usuario.perfil == 'organizador' %}
+    {% if rateio and rateio.organizador_id == usuario.id %}
     <form method="post" action="/extrato/atualizar" class="d-inline">
         <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
         <button type="submit" class="btn btn-success">
@@ -77,6 +77,7 @@
                         {% endif %}
                     </td>
                     <td style="min-width: 300px;">
+                        {% if rateio.organizador_id == usuario.id %}
                         {% if t.eh_debito %}
                         <form method="post" action="/extrato/classificar" class="d-flex align-items-center gap-2 flex-wrap">
                             <input type="hidden" name="rateio_id" value="{{ rateio.id }}">
@@ -106,6 +107,9 @@
                             </select>
                             <button type="submit" class="btn btn-sm btn-success">Salvar identificador</button>
                         </form>
+                        {% endif %}
+                        {% else %}
+                        <span class="text-muted small">Somente visualização</span>
                         {% endif %}
                     </td>
                 </tr>
