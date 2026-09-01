@@ -1,4 +1,6 @@
 """Rotas de gestão de rateios (páginas HTML)."""
+import logging
+
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter
@@ -42,7 +44,11 @@ from repository.credito_cota import buscar_por_id as buscar_credito
 from repository.credito_cota import mover as mover_credito, remover as remover_credito
 from repository.responsabilidade import listar_por_rateio as listar_responsabilidades, substituir_do_membro
 from service.auth_service import exigir_login, hash_senha
-from service.cobrar_service import cobrar_cota as cobrar_cota_service, cobrar_e_enviar_whatsapp
+from service.cobrar_service import (
+    cobrar_cota as cobrar_cota_service,
+    cobrar_e_enviar_email,
+    cobrar_e_enviar_whatsapp,
+)
 from service.dashboard import montar_dashboard
 from service.extrato.etiqueta import montar_etiqueta
 from service.fechamento_despesas import fechar_despesas
@@ -51,6 +57,8 @@ from service.fechamento_pagamento import fechar_pagamentos, recalcular_fechament
 from ..dependencias import templates
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 
 def _decimal_ou(valor, default=None):
@@ -884,16 +892,38 @@ async def enviar_cobrancas(request: Request):
         return RedirectResponse(url="/fechamentos", status_code=303)
 
     mes_nome = MESES_NOME.get(mes_numero, mes_numero)
+    req = CobrarRequest(mes=mes_nome, ano=str(ano))
+
+    # O envio em lote tenta os DOIS canais de forma independente: uma falha no
+    # WhatsApp (ex.: bot desligado) não pode impedir o envio por e-mail, e
+    # vice-versa. As falhas por item são tratadas dentro de cobrar_service
+    # (marcam status='falha'); o try/except aqui é apenas uma rede de segurança
+    # contra erros inesperados no lote.
+    email_ok = True
+    whatsapp_ok = True
     try:
-        cobrar_e_enviar_whatsapp(CobrarRequest(mes=mes_nome, ano=str(ano)))
-    except Exception as e:
-        return RedirectResponse(
-            url=f"/fechamentos?rateio_id={rateio_id}&mensagem=Erro+ao+enviar+cobrancas",
-            status_code=303,
-        )
+        cobrar_e_enviar_email(req)
+    except Exception:
+        logger.exception("Erro inesperado ao enviar cobranças por e-mail (%s/%s).", mes_nome, ano)
+        email_ok = False
+
+    try:
+        cobrar_e_enviar_whatsapp(req)
+    except Exception:
+        logger.exception("Erro inesperado ao enviar cobranças por WhatsApp (%s/%s).", mes_nome, ano)
+        whatsapp_ok = False
+
+    if email_ok and whatsapp_ok:
+        mensagem = "Cobrancas+enviadas+por+email+e+WhatsApp"
+    elif email_ok:
+        mensagem = "Cobrancas+enviadas+por+email+(WhatsApp+indisponivel)"
+    elif whatsapp_ok:
+        mensagem = "Cobrancas+enviadas+apenas+por+WhatsApp"
+    else:
+        mensagem = "Erro+ao+enviar+cobrancas"
 
     return RedirectResponse(
-        url=f"/fechamentos?rateio_id={rateio_id}&mensagem=Cobrancas+enviadas+por+WhatsApp",
+        url=f"/fechamentos?rateio_id={rateio_id}&mensagem={mensagem}",
         status_code=303,
     )
 
