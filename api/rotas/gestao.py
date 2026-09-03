@@ -774,25 +774,25 @@ async def atualizar_extrato(request: Request):
 @router.get("/fechamentos", response_class=HTMLResponse)
 async def pagina_fechamentos(request: Request):
     usuario = exigir_login(request)
-    if usuario["perfil"] != "organizador":
-        return RedirectResponse(url="/", status_code=303)
+    rateios = _rateios_visiveis(usuario)
 
-    rateios = listar_por_organizador(usuario["id"])
     rateio_id = int(request.query_params.get("rateio_id", "0") or 0)
     if not rateio_id and rateios:
         rateio_id = rateios[0]["id"]
 
-    dashboard = [
-        item
-        for item in montar_dashboard(usuario=usuario)
-        if item["rateio"]["organizador_id"] == usuario["id"]
-    ]
+    # O dashboard já restringe aos rateios que o usuário organiza ou participa
+    # como membro; itens de outros rateios nunca são exibidos aqui.
+    dashboard = montar_dashboard(usuario=usuario)
     item = next((d for d in dashboard if d["rateio"]["id"] == rateio_id), None)
     if item is None and dashboard:
         item = dashboard[0]
 
     mensagem = request.query_params.get("mensagem", None)
     from datetime import datetime as _dt
+
+    # Ações (fechar mês, gerar/enviar cobranças, mover saldo etc.) ficam restritas
+    # ao organizador dono do rateio. Membros visualizam em modo somente leitura.
+    pode_editar = bool(item and item["rateio"]["organizador_id"] == usuario["id"])
 
     return templates.TemplateResponse(
         "fechamentos.html",
@@ -804,6 +804,7 @@ async def pagina_fechamentos(request: Request):
             "cotas": item["cotas"] if item else [],
             "meses": item["meses"] if item else [],
             "transferencias": item["transferencias"] if item else [],
+            "pode_editar": pode_editar,
             "mensagem": mensagem,
             "ano_atual": _dt.now().year,
             "mes_atual": _dt.now().month,
