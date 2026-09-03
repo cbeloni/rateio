@@ -17,7 +17,7 @@
         <a class="btn btn-sm btn-outline-secondary" href="/rateios">
             <i class="fas fa-arrow-left me-1"></i>Voltar
         </a>
-        {% if usuario.perfil == 'organizador' %}
+        {% if rateio.organizador_id == usuario.id %}
         <form method="post" action="/rateios/{{ rateio.id }}/remover"
               onsubmit="return confirm('Desativar o rateio {{ rateio.nome }}? Ele deixará de aparecer nas telas e nos fechamentos.');">
             <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -28,7 +28,7 @@
     </div>
 </div>
 
-{% if usuario.perfil == 'organizador' %}
+{% if rateio.organizador_id == usuario.id %}
 <div class="feature-card mb-4">
     <h3 class="h6 mb-3">Configuração do rateio</h3>
     <form method="post" action="/rateios/{{ rateio.id }}" class="row g-3">
@@ -85,7 +85,6 @@
                         <tr>
                             <th>Identificador</th>
                             <th>Descrição</th>
-                            <th>Fundo (R$)</th>
                             <th>Membros</th>
                             <th></th>
                         </tr>
@@ -95,7 +94,6 @@
                         <tr>
                             <td class="fw-bold">{{ cota.identificador }}</td>
                             <td>{{ cota.descricao or '-' }}</td>
-                            <td>{{ cota.valor_fundo if cota.valor_fundo is not none else '(padrão)' }}</td>
                             <td>{{ cota.membros|length }}</td>
                             <td class="text-end">
                                 <a class="btn btn-sm btn-outline-success" href="/cotas/{{ cota.id }}">
@@ -113,7 +111,7 @@
         </div>
     </div>
 
-    {% if usuario.perfil == 'organizador' %}
+    {% if rateio.organizador_id == usuario.id %}
     <div class="col-lg-4">
         <form class="feature-card" method="post" action="/cotas">
             <h3 class="h6 mb-3">Nova cota</h3>
@@ -125,10 +123,6 @@
             <div class="mb-3">
                 <label class="form-label">Descrição (opcional)</label>
                 <input type="text" class="form-control" name="descricao">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Valor do fundo (R$, vazio = padrão)</label>
-                <input type="number" step="0.01" class="form-control" name="valor_fundo">
             </div>
             <button type="submit" class="btn btn-success w-100">
                 <i class="fas fa-plus me-1"></i>Adicionar

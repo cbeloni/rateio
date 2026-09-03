@@ -53,11 +53,14 @@
                             <td>{{ categoria.ordem }}</td>
                             <td>{{ 'Sim' if categoria.ativo else 'Não' }}</td>
                             <td class="text-end">
+                                {% if rateio.organizador_id == usuario.id %}
                                 <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#cat-{{ categoria.id }}">
                                     <i class="fas fa-edit"></i>
                                 </button>
+                                {% endif %}
                             </td>
                         </tr>
+                        {% if rateio.organizador_id == usuario.id %}
                         <tr class="collapse" id="cat-{{ categoria.id }}">
                             <td colspan="6">
                                 <form method="post" action="/categorias/{{ categoria.id }}" class="row g-2">
@@ -86,6 +89,7 @@
                                 </form>
                             </td>
                         </tr>
+                        {% endif %}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -96,7 +100,7 @@
         </div>
     </div>
 
-    {% if usuario.perfil == 'organizador' %}
+    {% if rateio.organizador_id == usuario.id %}
     <div class="col-lg-5">
         <form class="feature-card" method="post" action="/categorias">
             <h3 class="h6 mb-3">Nova categoria</h3>

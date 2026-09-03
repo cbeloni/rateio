@@ -39,7 +39,7 @@ from repository.rateio import (
     listar_por_membro,
     listar_por_organizador,
 )
-from repository.usuario import Usuario, buscar_por_email, listar_usuarios
+from repository.usuario import PERFIS, Usuario, buscar_por_email, listar_usuarios
 from repository.credito_cota import buscar_por_id as buscar_credito
 from repository.credito_cota import mover as mover_credito, remover as remover_credito
 from repository.responsabilidade import listar_por_rateio as listar_responsabilidades, substituir_do_membro
@@ -73,6 +73,11 @@ def _decimal_ou(valor, default=None):
 
 def _parse_identificadores(texto):
     return [s.strip() for s in (texto or "").split(",") if s.strip()]
+
+
+def _perfil_membro(valor, padrao="membro"):
+    perfil = str(valor or "").strip().lower()
+    return perfil if perfil in PERFIS else padrao
 
 
 MESES_NUMERO = {
@@ -130,25 +135,23 @@ def _membro_de_rateio(usuario_id: int, rateio_id: int) -> bool:
     """Verifica se o usuário é membro de alguma cota do rateio."""
     for cota in listar_cotas(rateio_id):
         for membro in listar_membros(cota["id"]):
-            if membro.get("usuario_id") == usuario_id:
+            if membro.get("usuario_id") == usuario_id and membro.get("ativo"):
                 return True
     return False
 
 
 def _rateios_visiveis(usuario):
-    if usuario["perfil"] == "organizador":
-        return listar_por_organizador(usuario["id"])
-    return listar_por_membro(usuario["id"])
+    """Rateios próprios e rateios nos quais o usuário é membro."""
+    rateios = listar_por_organizador(usuario["id"]) + listar_por_membro(usuario["id"])
+    return list({rateio["id"]: rateio for rateio in rateios}.values())
 
 
 def _rateio_acessivel(usuario, rateio_id):
     rateio = buscar_rateio(rateio_id)
     if not rateio:
         return None
-    if usuario["perfil"] == "organizador":
-        if rateio.organizador_id == usuario["id"]:
-            return rateio
-        return None
+    if rateio.organizador_id == usuario["id"]:
+        return rateio
     if _membro_de_rateio(usuario["id"], rateio_id):
         return rateio
     return None
@@ -159,7 +162,7 @@ def _rateio_do_organizador(usuario, rateio_id):
     rateio = buscar_rateio(rateio_id)
     if not rateio:
         return None
-    if usuario["perfil"] == "organizador" and rateio.organizador_id == usuario["id"]:
+    if rateio.organizador_id == usuario["id"]:
         return rateio
     return None
 
@@ -279,9 +282,6 @@ async def criar_cota(request: Request):
     rateio_id = int(form.get("rateio_id", "0") or 0)
     identificador = str(form.get("identificador", "")).strip()
     descricao = str(form.get("descricao", "")).strip() or None
-    valor_fundo_raw = str(form.get("valor_fundo", "")).strip()
-    valor_fundo = _decimal_ou(valor_fundo_raw, None) if valor_fundo_raw else None
-
     rateio = _rateio_do_organizador(usuario, rateio_id)
     if not rateio or not identificador:
         return RedirectResponse(url=f"/rateios/{rateio_id}", status_code=303)
@@ -290,7 +290,6 @@ async def criar_cota(request: Request):
         rateio_id=rateio_id,
         identificador=identificador,
         descricao=descricao,
-        valor_fundo=valor_fundo,
         ordem=len(listar_cotas(rateio_id)) + 1,
         ativo=True,
     )
@@ -353,9 +352,6 @@ async def salvar_cota(request: Request, cota_id: int):
     cota.identificador = str(form.get("identificador", "")).strip() or cota.identificador
     cota.descricao = str(form.get("descricao", "")).strip() or None
 
-    valor_fundo_raw = str(form.get("valor_fundo", "")).strip()
-    cota.valor_fundo = _decimal_ou(valor_fundo_raw, None) if valor_fundo_raw else None
-
     cota.ativo = form.get("ativo") is not None
 
     session = get_session()
@@ -378,6 +374,11 @@ async def criar_membro(request: Request):
     senha_inicial = str(form.get("senha_inicial", "")).strip() or None
     principal = form.get("principal") is not None
     receber_mensagens = form.get("receber_mensagens") is not None
+    perfil = (
+        "organizador"
+        if email and email.casefold() == usuario["email"].casefold()
+        else "membro"
+    )
 
     cota = buscar_cota(cota_id)
     if not cota or not nome:
@@ -395,6 +396,7 @@ async def criar_membro(request: Request):
         telefone,
         identificadores,
         senha_inicial=senha_inicial,
+        perfil=perfil,
         principal=principal,
         receber_mensagens=receber_mensagens,
     )
@@ -429,6 +431,7 @@ async def salvar_membro(request: Request, membro_id: int):
     identificadores = _parse_identificadores(form.get("identificadores", ""))
     principal = form.get("principal") is not None
     receber_mensagens = form.get("receber_mensagens") is not None
+    perfil = _perfil_membro(form.get("perfil"))
 
     categoria_ids = form.getlist("categorias_responsavel")
     _salvar_membro(
@@ -438,6 +441,7 @@ async def salvar_membro(request: Request, membro_id: int):
         telefone,
         identificadores,
         membro_id=membro_id,
+        perfil=perfil,
         principal=principal,
         receber_mensagens=receber_mensagens,
     )
@@ -466,9 +470,13 @@ def _vincular_usuario(nome, email, senha_inicial):
     return usuario.id
 
 
-def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=None, membro_id=None, senha_inicial=None, principal=False, receber_mensagens=True):
+def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=None, membro_id=None, senha_inicial=None, perfil="membro", principal=False, receber_mensagens=True):
     if senha_inicial and email:
         usuario_id = _vincular_usuario(nome, email, senha_inicial)
+    elif email and usuario_id is None:
+        existente = buscar_por_email(email)
+        if existente:
+            usuario_id = existente.id
 
     session = get_session()
     if membro_id:
@@ -477,6 +485,7 @@ def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=N
             session.close()
             return None
         membro.nome = nome
+        membro.perfil = _perfil_membro(perfil)
         membro.email = email
         membro.telefone = telefone
         membro.principal = bool(principal)
@@ -487,6 +496,7 @@ def _salvar_membro(cota_id, nome, email, telefone, identificadores, usuario_id=N
         membro = Membro(
             cota_id=cota_id,
             nome=nome,
+            perfil=_perfil_membro(perfil),
             email=email,
             telefone=telefone,
             principal=bool(principal),
@@ -767,12 +777,16 @@ async def pagina_fechamentos(request: Request):
     if usuario["perfil"] != "organizador":
         return RedirectResponse(url="/", status_code=303)
 
-    rateios = _rateios_visiveis(usuario)
+    rateios = listar_por_organizador(usuario["id"])
     rateio_id = int(request.query_params.get("rateio_id", "0") or 0)
     if not rateio_id and rateios:
         rateio_id = rateios[0]["id"]
 
-    dashboard = montar_dashboard(usuario=usuario)
+    dashboard = [
+        item
+        for item in montar_dashboard(usuario=usuario)
+        if item["rateio"]["organizador_id"] == usuario["id"]
+    ]
     item = next((d for d in dashboard if d["rateio"]["id"] == rateio_id), None)
     if item is None and dashboard:
         item = dashboard[0]

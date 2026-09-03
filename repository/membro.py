@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, DECIMAL, Integer, JSON, String
+from sqlalchemy import Boolean, Column, DateTime, DECIMAL, Integer, JSON, String, func
 
 from config.database import get_session
 from repository.base import Base
@@ -13,6 +13,7 @@ class Membro(Base):
     cota_id = Column(Integer, nullable=False)
     usuario_id = Column(Integer, nullable=True)
     nome = Column(String(255), nullable=False)
+    perfil = Column(String(20), nullable=False, default="membro")
     email = Column(String(255), nullable=True)
     telefone = Column(String(50), nullable=True)
     identificadores_pagamento = Column(JSON, nullable=True)
@@ -36,6 +37,7 @@ class Membro(Base):
             "cota_id": self.cota_id,
             "usuario_id": self.usuario_id,
             "nome": self.nome,
+            "perfil": self.perfil,
             "email": self.email,
             "telefone": self.telefone,
             "identificadores_pagamento": self.identificadores_pagamento or [],
@@ -100,3 +102,35 @@ def buscar_por_id(membro_id: int):
     membro = session.query(Membro).filter(Membro.id == membro_id).first()
     session.close()
     return membro
+
+
+def vincular_por_email(email: str, usuario_id: int) -> int:
+    """Vincula ao usuário os membros cadastrados com o mesmo e-mail.
+
+    O e-mail é a chave de integração entre um cadastro de usuário e a lista
+    de membros. A comparação ignora espaços nas extremidades e diferença de
+    maiúsculas/minúsculas.
+    """
+    email_normalizado = (email or "").strip().lower()
+    if not email_normalizado:
+        return 0
+
+    session = get_session()
+    try:
+        membros = (
+            session.query(Membro)
+            .filter(
+                func.lower(func.trim(Membro.email)) == email_normalizado,
+                Membro.ativo.is_(True),
+            )
+            .all()
+        )
+        for membro in membros:
+            membro.usuario_id = usuario_id
+        session.commit()
+        return len(membros)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()

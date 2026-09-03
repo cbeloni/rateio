@@ -33,7 +33,7 @@
    - `valor` — **nullable**; `NULL` significa "assume o valor integral" da categoria.
    - `ativo`
 
-3. **`rateio`** perde `valor_fundo_padrao`; **`cota`** perde `valor_fundo` (o fundo deixa de ser configurado nesses níveis).
+3. O fundo deixa de ser configurado no `rateio` e na `cota`; passa a ser uma categoria fixa.
 
 4. **`cobrancas`** ganha `membro_id` (nullable): a cobrança pode ser **por cota** (padrão, restante) ou **por membro** (quando há responsável).
 
@@ -90,14 +90,14 @@ Adotar a **Solução A (tabela `responsabilidades`)**, pois atende integralmente
 1. **Categoria fixa não é despesa**: categorias com `valor_fixo` **não** entram no "total de despesas"/parcela (são obrigações fixas separadas). Cuidado para não somá-las junto com as despesas.
 2. **QR por membro**: `cobrancas.membro_id` afeta `service/fechamento_despesas.py`, `service/cobrar_service.py` (contato por membro) e a tela de fechamentos.
 3. **Casamento de pagamento**: o crédito do dia 1 (Alexandre) precisa ser reconhecido como pagamento da categoria fixa (fundo) — senão aparece como "pagamento comum" e a categoria fica em aberto.
-4. **Migração**: criar a categoria "fundo" (valor_fixo 100); remover `valor_fundo_padrao` do rateio e `valor_fundo` das cotas; converter o `valor_fixo` do Alexandre em `responsabilidade` de fundo; remover a lógica antiga de `valor_fixo`.
+4. **Migração**: criar a categoria "fundo" (valor_fixo 100); remover a configuração antiga de fundo do rateio e das cotas; converter o `valor_fixo` do Alexandre em `responsabilidade` de fundo; remover a lógica antiga de `valor_fixo`.
 5. **Membro principal x responsável**: AP1 tem Everton + Alexandre. O **membro principal** paga o restante (parcela + fixas não atribuídas); um membro marcado como responsável por uma categoria recebe o QR dessa categoria. É preciso deixar explícito quem é o principal de cada cota.
 
 ---
 
 ## 7. Passos de implementação (Solução A)
 
-1. **Banco**: adicionar `valor_fixo` em `categorias`; criar tabela `responsabilidades`; adicionar `membro_id` em `cobrancas`; remover `valor_fundo_padrao` do rateio e `valor_fundo` da cota (migração).
+1. **Banco**: adicionar `valor_fixo` em `categorias`; criar tabela `responsabilidades`; adicionar `membro_id` em `cobrancas`; remover a configuração antiga de fundo do rateio e da cota (migração).
 2. **Telas**: ao criar/editar categoria, campo **valor fixo** (opcional) e opção de **responsável** (membro); na cota/membro, marcação do **membro principal** e associação `membro → categoria → valor`.
 3. **Geração de QR** (`fechamento_despesas`): QR por membro responsável + QR da cota (membro principal) para o restante.
 4. **Fechamento de pagamentos** (`fechamento_pagamento`): reconhecer o pagamento das categorias fixas/atribuídas (crédito do responsável) no saldo da cota.
@@ -109,4 +109,3 @@ Adotar a **Solução A (tabela `responsabilidades`)**, pois atende integralmente
 ## 8. Fora de escopo (não alterar)
 
 - A regra "mês M = créditos em M+1" está **correta** e deve ser mantida (pagamento do dia 1 refere-se ao mês anterior).
-

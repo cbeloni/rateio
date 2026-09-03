@@ -5,6 +5,7 @@ from dotenv import dotenv_values, load_dotenv
 from fastapi import HTTPException, Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
+from repository.membro import vincular_por_email
 from repository.usuario import Usuario, buscar_por_email, buscar_por_id
 
 load_dotenv()
@@ -134,6 +135,7 @@ def autenticar(email: str, senha: str) -> dict | None:
         return None
 
     if verificar_senha(senha, senha_hash, salt_hex):
+        vincular_por_email(usuario.email, usuario.id)
         return usuario.to_dict()
     return None
 

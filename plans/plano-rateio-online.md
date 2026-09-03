@@ -100,7 +100,7 @@ fixos). A tabela abaixo é a referência da implementação genérica:
 | Importação de extrato — `POST /extrato`, `POST /movimentos-pagbank`, `GET /mail`, `GET /drive` | Lê Pluggy/Mercado Pago/PagBank/e-mail/Drive e grava as transações | `extrato` (mesmos provedores) |
 | Fechamento de despesas — `POST /fechamento-despesas` | Classifica débitos por categoria (identificadores), grava despesas e gera QR por apartamento (último dia do mês após 19h, ou sem validação de mês) | `despesas` + `cobrancas`, com categorias dinâmicas |
 | Fechamento de pagamentos — `POST /fechamento-pagamentos` | Casa créditos com o apartamento pelos identificadores do morador; caixa = excedente (`pagamentos − valor_mensal`) ou identificado por `caixa_pago_por` | `fechamentos_cota` (pagamentos/fundo/saldo) |
-| Caixa configurável — `valor_caixa_padrao`, `valor_caixa` | Fundo padrão por prédio, sobrescrito por apartamento | `valor_fundo_padrao`, `valor_fundo` |
+| Caixa configurável — `valor_caixa_padrao`, `valor_caixa` | Fundo padrão por prédio | `valor_fundo_padrao` |
 | Caixa manual — `POST /caixa-manual` | Transferência pontual de caixa entre apartamentos no mês (ajuste avulso) | `fundo_manual` (seção 5.5) |
 | Cobrança por e-mail — `POST /cobrar` | Envia e-mail com QR Pix ao morador responsável e marca como enviado | `cobrancas` + membro responsável |
 | Cobrança por WhatsApp — `POST /cobrar-whatsapp` | Envia WhatsApp com QR Pix e marca a notificação | idem |
@@ -167,7 +167,6 @@ colunas `ap1..4`) **deixam de existir**.
 | `rateio_id` | INT FK `rateios.id` | ex-`predio_id` |
 | `identificador` | VARCHAR(50) | ex.: `AP1`, `101`, `João` |
 | `descricao` | VARCHAR(50) NULL | ex-`numero` |
-| `valor_fundo` | DECIMAL(10,2) NULL | ex-`valor_caixa`; NULL = usa `rateios.valor_fundo_padrao` |
 | `ordem` | INT | |
 | `ativo` | BOOL | default true |
 | `created_at` | DATETIME | |
@@ -305,8 +304,7 @@ colunas `ap1..4`) **deixam de existir**.
 Mantém a regra atual, com nomes genéricos:
 
 1. `rateios.valor_fundo_padrao` define o default (condomínio: `100.00`; viagem: `0.00`).
-2. `cotas.valor_fundo` sobrescreve por cota.
-3. Qualquer **membro** da cota que fizer um pagamento (identificado no extrato pelos
+2. Qualquer **membro** da cota que fizer um pagamento (identificado no extrato pelos
    `identificadores_pagamento`) soma ao `pagamentos` da cota; o fundo é o excedente
    (`pagamentos − parcela`) e entra na cobrança da cota.
 
@@ -427,7 +425,7 @@ Seguir o padrão existente (`Base`, `get_session()`).
 - Exibir `saldo` acumulado por cota (essencial para a viagem).
 
 ### 7.6 `service/condominio_service.py` → `service/rateio_service.py`
-- `valor_caixa_do_apartamento` → `valor_fundo_da_cota(predio, cota)`.
+- A configuração antiga de fundo por apartamento é substituída por categorias fixas.
 
 ### 7.7 `util/identificadores.py`
 - **Remover** o arquivo (dados fixos de condomínio).
@@ -472,7 +470,7 @@ Como o banco nasce vazio e `util/identificadores.py` é removido, criar
 **`scripts/seed_rateio_condominio.py`** (opcional, executado manualmente) que recria:
 
 - `Rateio` "Condomínio Padrão" com `valor_fundo_padrao = 100.00`;
-- `Cotas` `AP1..AP4` (`valor_fundo`: AP1 = 0; AP2/AP3/AP4 = 100);
+- `Cotas` `AP1..AP4` sem configuração individual de fundo;
 - `Membros` com os mesmos nomes/e-mails/telefones/identificadores atuais;
 - `Categorias` `enel`, `sabesp`, `faxina`, `outros` com os identificadores atuais.
 

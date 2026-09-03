@@ -18,6 +18,7 @@
 
 <div class="feature-card mb-4">
     <h3 class="h6 mb-3">Configuração</h3>
+    {% if rateio.organizador_id == usuario.id %}
     <form method="post" action="/cotas/{{ cota.id }}" class="row g-3 align-items-end">
         <div class="col-md-4">
             <label class="form-label">Identificador</label>
@@ -26,10 +27,6 @@
         <div class="col-md-4">
             <label class="form-label">Descrição (opcional)</label>
             <input type="text" class="form-control" name="descricao" value="{{ cota.descricao or '' }}">
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Valor do fundo (R$, vazio = padrão do rateio)</label>
-            <input type="number" step="0.01" class="form-control" name="valor_fundo" value="{{ cota.valor_fundo if cota.valor_fundo is not none else '' }}">
         </div>
         <div class="col-12 d-flex align-items-center gap-3">
             <div class="form-check mb-0">
@@ -41,6 +38,9 @@
             </button>
         </div>
     </form>
+    {% else %}
+    <p class="text-muted mb-0">Visualização disponível somente para o organizador deste rateio.</p>
+    {% endif %}
 </div>
 
 <div class="feature-card">
@@ -51,6 +51,7 @@
                     <thead>
                         <tr>
                             <th>Nome</th>
+                            <th>Perfil</th>
                             <th>E-mail</th>
                             <th>Telefone</th>
                             <th>Principal</th>
@@ -63,19 +64,27 @@
                         {% for membro in membros %}
                         <tr>
                             <td class="fw-bold">{{ membro.nome }}</td>
+                            <td>
+                                <span class="badge {{ 'bg-success' if membro.perfil == 'organizador' else 'bg-secondary' }}">
+                                    {{ 'Organizador' if membro.perfil == 'organizador' else 'Membro' }}
+                                </span>
+                            </td>
                             <td>{{ membro.email or '-' }}</td>
                             <td>{{ membro.telefone or '-' }}</td>
                             <td>{% if membro.principal %}<i class="fas fa-star text-warning" title="Membro principal"></i>{% else %}-{% endif %}</td>
                             <td><small>{{ membro.categorias_responsavel_nomes|join(', ') or '-' }}</small></td>
                             <td><small>{{ membro.identificadores_pagamento|join(', ') }}</small></td>
                             <td class="text-end">
+                                {% if rateio.organizador_id == usuario.id %}
                                 <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#membro-{{ membro.id }}">
                                     <i class="fas fa-edit"></i>
                                 </button>
+                                {% endif %}
                             </td>
                         </tr>
+                        {% if rateio.organizador_id == usuario.id %}
                         <tr class="collapse" id="membro-{{ membro.id }}">
-                            <td colspan="7">
+                            <td colspan="8">
                                 <form method="post" action="/membros/{{ membro.id }}" class="row g-2">
                                     <div class="col-md-3">
                                         <label class="form-label small">Nome</label>
@@ -88,6 +97,13 @@
                                     <div class="col-md-3">
                                         <label class="form-label small">Telefone</label>
                                         <input type="text" class="form-control form-control-sm" name="telefone" value="{{ membro.telefone or '' }}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">Perfil</label>
+                                        <select class="form-select form-select-sm" name="perfil">
+                                            <option value="membro" {% if membro.perfil == 'membro' %}selected{% endif %}>Membro</option>
+                                            <option value="organizador" {% if membro.perfil == 'organizador' %}selected{% endif %}>Organizador</option>
+                                        </select>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label small">Identificadores de pagamento</label>
@@ -119,6 +135,7 @@
                                 </form>
                             </td>
                         </tr>
+                        {% endif %}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -127,6 +144,7 @@
             <p class="text-muted mb-0">Nenhum membro vinculado ainda.</p>
             {% endif %}
 
+            {% if rateio.organizador_id == usuario.id %}
             <hr class="my-4">
 
             <h3 class="h6 mb-3">Adicionar membro</h3>
@@ -178,5 +196,6 @@
                     </button>
                 </div>
             </form>
+            {% endif %}
         </div>
 {% endblock %}
