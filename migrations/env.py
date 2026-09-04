@@ -20,6 +20,7 @@ from repository import (  # noqa: F401
     despesa,
     fechamento_cota,
     membro,
+    login,
     rateio,
     responsabilidade,
 )

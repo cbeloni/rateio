@@ -19,6 +19,7 @@ def criar_tabelas_rateio(engine=None):
     from repository import despesa as _despesa  # noqa: F401
     from repository import fechamento_cota as _fechamento_cota  # noqa: F401
     from repository import membro as _membro  # noqa: F401
+    from repository import login as _login  # noqa: F401
     from repository import rateio as _rateio  # noqa: F401
     from repository import responsabilidade as _responsabilidade  # noqa: F401
 

@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.requests import Request
 
 from repository.usuario import ativar_usuario, listar_usuarios
+from repository.login import registrar_login
 from service.auth_service import (
     autenticar,
     criar_sessao,
@@ -21,6 +22,22 @@ from service.auth_service import (
 from ..dependencias import templates
 
 router = APIRouter()
+
+
+def _registrar_tentativa_login(request: Request, **dados) -> None:
+    """Registra a tentativa sem deixar a auditoria impedir o fluxo de login."""
+    cliente = request.client
+    try:
+        registrar_login(
+            ip=cliente.host if cliente else None,
+            ip_encaminhado=request.headers.get("x-forwarded-for"),
+            user_agent=request.headers.get("user-agent"),
+            idioma=request.headers.get("accept-language"),
+            rota=request.url.path,
+            **dados,
+        )
+    except Exception:
+        logging.exception("Não foi possível registrar a tentativa de login")
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -47,6 +64,13 @@ async def fazer_login(request: Request):
     senha = str(form.get("senha", ""))
 
     if not email or not senha:
+        _registrar_tentativa_login(
+            request,
+            usuario_id=None,
+            email=email or None,
+            sucesso=False,
+            motivo="campos_obrigatorios",
+        )
         return templates.TemplateResponse(
             "login.html",
             {
@@ -61,6 +85,13 @@ async def fazer_login(request: Request):
     try:
         usuario = autenticar(email, senha)
     except ValueError as e:
+        _registrar_tentativa_login(
+            request,
+            usuario_id=None,
+            email=email,
+            sucesso=False,
+            motivo="conta_inativa",
+        )
         return templates.TemplateResponse(
             "login.html",
             {
@@ -73,6 +104,13 @@ async def fazer_login(request: Request):
         )
 
     if not usuario:
+        _registrar_tentativa_login(
+            request,
+            usuario_id=None,
+            email=email,
+            sucesso=False,
+            motivo="credenciais_invalidas",
+        )
         return templates.TemplateResponse(
             "login.html",
             {
@@ -84,6 +122,13 @@ async def fazer_login(request: Request):
             status_code=401,
         )
 
+    _registrar_tentativa_login(
+        request,
+        usuario_id=usuario["id"],
+        email=email,
+        sucesso=True,
+        motivo="autenticado",
+    )
     criar_sessao(request, usuario["id"])
     return RedirectResponse(url="/", status_code=303)
 
